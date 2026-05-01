@@ -9,11 +9,15 @@ const calendar = google.calendar({ version: "v3", auth });
 
 const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID || "primary";
 
+const getPromoLabel = (booking) => {
+  return booking.promoId?.name || booking.promo || booking.promoCode || "-";
+};
+
 const buildDescription = (booking) => {
   return [
     `Booking from ${booking.sourceName || booking.source || "-"}`,
     `Guest: ${booking.guestName || "-"}`,
-    `Promo: ${booking.promo || booking.promoCode || "-"}`,
+    `Promo: ${getPromoLabel(booking)}`,
     `Notes: ${booking.notes || "-"}`
   ].join("\n");
 };

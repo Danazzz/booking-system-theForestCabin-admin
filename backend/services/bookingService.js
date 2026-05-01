@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Channel from "../models/Channel.js";
+import { ensureActivePromo } from "./promoService.js";
 import { ensureAvailability, parseStayDates } from "./availabilityService.js";
 import { createOverbookingAttemptAlert } from "./alertService.js";
 import { ConflictError, NotFoundError, ValidationError } from "./bookingErrors.js";
@@ -37,6 +38,7 @@ const bookingUpdateFields = [
   "checkIn",
   "checkOut",
   "price",
+  "promoId",
   "promo",
   "promoCode",
   "notes",
@@ -67,6 +69,34 @@ const handleDuplicateBooking = (error) => {
   }
 
   throw error;
+};
+
+const validateNotes = (notes) => {
+  if (notes !== undefined && notes !== null && String(notes).length > 500) {
+    throw new ValidationError("notes must be 500 characters or fewer");
+  }
+};
+
+const resolvePromoId = async (promoId) => {
+  if (promoId === undefined) {
+    return undefined;
+  }
+
+  if (promoId === null || promoId === "") {
+    return null;
+  }
+
+  const promo = await ensureActivePromo(promoId);
+
+  return promo._id;
+};
+
+const populateBooking = (booking) => {
+  return Booking.findById(booking._id)
+    .populate("propertyId", "name timezone")
+    .populate("roomId", "name code totalUnits")
+    .populate("channelId", "name type isActive")
+    .populate("promoId", "name description isActive");
 };
 
 const resolveChannel = async ({
@@ -183,6 +213,7 @@ const addGoogleCalendarEvent = async (booking) => {
 
 export const createBooking = async (payload) => {
   const { checkIn, checkOut } = parseStayDates(payload);
+  validateNotes(payload.notes);
   const channel = await resolveChannel({
     propertyId: payload.propertyId,
     channelId: payload.channelId,
@@ -190,6 +221,7 @@ export const createBooking = async (payload) => {
     source: payload.source
   });
   const roomCount = parseRoomCount(payload.roomCount);
+  const promoId = await resolvePromoId(payload.promoId);
 
   await ensureBookingAvailability({
     propertyId: payload.propertyId,
@@ -213,6 +245,7 @@ export const createBooking = async (payload) => {
       checkIn,
       checkOut,
       price: payload.price,
+      promoId,
       promo: payload.promo,
       promoCode: payload.promoCode,
       notes: payload.notes,
@@ -220,21 +253,25 @@ export const createBooking = async (payload) => {
       rawPayload: payload.rawPayload
     });
 
-    await addGoogleCalendarEvent(booking);
-    await notifyBookingSuccessful(booking);
+    const populatedBooking = await populateBooking(booking);
+    await addGoogleCalendarEvent(populatedBooking);
+    const savedBooking = await populateBooking(populatedBooking);
+    await notifyBookingSuccessful(savedBooking);
 
-    return booking;
+    return savedBooking;
   } catch (error) {
     handleDuplicateBooking(error);
   }
 };
 
 export const updateExistingBooking = async (booking, payload) => {
+  validateNotes(payload.notes);
   const { checkIn, checkOut } = parseStayDates({
     checkIn: payload.checkIn ?? booking.checkIn,
     checkOut: payload.checkOut ?? booking.checkOut
   });
   const roomCount = parseRoomCount(payload.roomCount ?? booking.roomCount);
+  const promoId = await resolvePromoId(payload.promoId);
   const hasChannelInput = payload.channelId || payload.sourceName || payload.source;
   const channel = await resolveChannel({
     propertyId: booking.propertyId,
@@ -263,6 +300,9 @@ export const updateExistingBooking = async (booking, payload) => {
   booking.checkIn = checkIn;
   booking.checkOut = checkOut;
   booking.price = payload.price ?? booking.price;
+  if (promoId !== undefined) {
+    booking.promoId = promoId;
+  }
   booking.promo = payload.promo ?? booking.promo;
   booking.promoCode = payload.promoCode ?? booking.promoCode;
   booking.notes = payload.notes ?? booking.notes;
@@ -271,18 +311,19 @@ export const updateExistingBooking = async (booking, payload) => {
 
   try {
     const savedBooking = await booking.save();
+    const populatedBooking = await populateBooking(savedBooking);
 
     try {
-      if (savedBooking.googleCalendarEventId) {
-        await updateEvent(savedBooking.googleCalendarEventId, savedBooking);
+      if (populatedBooking.googleCalendarEventId) {
+        await updateEvent(populatedBooking.googleCalendarEventId, populatedBooking);
       } else {
-        await addGoogleCalendarEvent(savedBooking);
+        await addGoogleCalendarEvent(populatedBooking);
       }
     } catch (error) {
       console.error("Google update event error:", error.message);
     }
 
-    return savedBooking;
+    return populateBooking(populatedBooking);
   } catch (error) {
     handleDuplicateBooking(error);
   }
@@ -294,6 +335,7 @@ export const listBookings = async (filters = {}) => {
   if (filters.propertyId) query.propertyId = filters.propertyId;
   if (filters.roomId) query.roomId = filters.roomId;
   if (filters.channelId) query.channelId = filters.channelId;
+  if (filters.promoId) query.promoId = filters.promoId;
   if (filters.source) query.source = filters.source;
   if (filters.status) query.status = filters.status;
 
@@ -301,6 +343,7 @@ export const listBookings = async (filters = {}) => {
     .populate("propertyId", "name timezone")
     .populate("roomId", "name code totalUnits")
     .populate("channelId", "name type isActive")
+    .populate("promoId", "name description isActive")
     .sort({ checkIn: 1, createdAt: 1 });
 };
 
@@ -310,7 +353,8 @@ export const getBookingById = async (bookingId) => {
   const booking = await Booking.findById(bookingId)
     .populate("propertyId", "name timezone")
     .populate("roomId", "name code totalUnits")
-    .populate("channelId", "name type isActive");
+    .populate("channelId", "name type isActive")
+    .populate("promoId", "name description isActive");
 
   if (!booking) {
     throw new NotFoundError("Booking not found");

@@ -7,6 +7,7 @@ import Channels from "./pages/Channels";
 import Configs from "./pages/Configs";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
+import Promos from "./pages/Promos";
 import Rooms from "./pages/Rooms";
 import Sync from "./pages/Sync";
 
@@ -24,6 +25,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/bookings" element={<Bookings />} />
         <Route path="/rooms" element={<Rooms />} />
+        <Route path="/promos" element={<Promos />} />
         <Route path="/channels" element={<Channels />} />
         <Route path="/configs" element={<Configs />} />
         <Route path="/alerts" element={<Alerts />} />

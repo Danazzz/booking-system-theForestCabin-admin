@@ -55,6 +55,11 @@ const bookingSchema = new mongoose.Schema(
       required: true
     },
     price: Number,
+    promoId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Promo",
+      index: true
+    },
     promo: {
       type: String,
       trim: true
@@ -62,7 +67,8 @@ const bookingSchema = new mongoose.Schema(
     promoCode: String,
     notes: {
       type: String,
-      trim: true
+      trim: true,
+      maxlength: 500
     },
     status: {
       type: String,

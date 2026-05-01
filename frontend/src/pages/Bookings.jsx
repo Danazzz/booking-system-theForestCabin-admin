@@ -12,8 +12,7 @@ const emptyForm = {
   checkIn: "",
   checkOut: "",
   price: "",
-  promo: "",
-  promoCode: "",
+  promoId: "",
   notes: ""
 };
 
@@ -47,6 +46,7 @@ const cleanPayload = (form) => {
 
 function Bookings() {
   const [bookings, setBookings] = useState([]);
+  const [promos, setPromos] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [error, setError] = useState("");
@@ -63,10 +63,14 @@ function Bookings() {
 
     const loadInitialBookings = async () => {
       try {
-        const response = await api.get("/bookings");
+        const [bookingsResponse, promosResponse] = await Promise.all([
+          api.get("/bookings"),
+          api.get("/promos", { params: { isActive: true } })
+        ]);
 
         if (!ignore) {
-          setBookings(response.data.data || []);
+          setBookings(bookingsResponse.data.data || []);
+          setPromos(promosResponse.data.data || []);
         }
       } catch (err) {
         if (!ignore) {
@@ -102,6 +106,7 @@ function Bookings() {
 
     try {
       const payload = cleanPayload(form);
+      payload.promoId = form.promoId || null;
 
       if (editingId) {
         await api.patch(`/bookings/${editingId}`, payload);
@@ -133,8 +138,9 @@ function Bookings() {
       checkIn: toDateInput(booking.checkIn),
       checkOut: toDateInput(booking.checkOut),
       price: booking.price || "",
-      promo: booking.promo || "",
-      promoCode: booking.promoCode || "",
+      promoId: booking.promoId?.isActive === false
+        ? ""
+        : booking.promoId?._id || booking.promoId || "",
       notes: booking.notes || ""
     });
   };
@@ -156,10 +162,6 @@ function Bookings() {
     }
   };
 
-  const promoOptions = Array.from(
-    new Set(bookings.map((booking) => booking.promo).filter(Boolean))
-  );
-
   return (
     <section className="space-y-6">
       <div>
@@ -178,14 +180,15 @@ function Bookings() {
         <input name="checkIn" type="date" value={form.checkIn} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="checkOut" type="date" value={form.checkOut} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="price" type="number" min="0" value={form.price} onChange={handleChange} placeholder="Price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="promo" list="promo-options" value={form.promo} onChange={handleChange} placeholder="Promo" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <datalist id="promo-options">
-          {promoOptions.map((promo) => (
-            <option key={promo} value={promo} />
+        <select name="promoId" value={form.promoId} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+          <option value="">No promo</option>
+          {promos.map((promo) => (
+            <option key={promo._id} value={promo._id}>
+              {promo.name}
+            </option>
           ))}
-        </datalist>
-        <input name="promoCode" value={form.promoCode} onChange={handleChange} placeholder="Promo code" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <textarea name="notes" value={form.notes} onChange={handleChange} placeholder="Notes" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-4" />
+        </select>
+        <textarea name="notes" value={form.notes} onChange={handleChange} maxLength="500" placeholder="Notes" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-4" />
         <div className="flex flex-col gap-2 sm:flex-row md:col-span-4">
           <button type="submit" disabled={loading} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
             {editingId ? "Update booking" : "Create booking"}
@@ -202,7 +205,7 @@ function Bookings() {
       {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-md border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-[900px] divide-y divide-gray-200 text-sm">
+        <table className="min-w-[1040px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-4 py-3">Guest</th>
@@ -211,6 +214,7 @@ function Bookings() {
               <th className="px-4 py-3">Check in</th>
               <th className="px-4 py-3">Check out</th>
               <th className="px-4 py-3">Promo</th>
+              <th className="px-4 py-3">Notes</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -223,7 +227,8 @@ function Bookings() {
                 <td className="px-4 py-3">{booking.sourceName || booking.source || "-"}</td>
                 <td className="px-4 py-3">{booking.checkIn ? new Date(booking.checkIn).toLocaleDateString() : "-"}</td>
                 <td className="px-4 py-3">{booking.checkOut ? new Date(booking.checkOut).toLocaleDateString() : "-"}</td>
-                <td className="px-4 py-3">{booking.promo || booking.promoCode || "-"}</td>
+                <td className="px-4 py-3">{booking.promoId?.name || booking.promo || booking.promoCode || "-"}</td>
+                <td className="max-w-56 truncate px-4 py-3" title={booking.notes || ""}>{booking.notes || "-"}</td>
                 <td className="px-4 py-3">{booking.status || "-"}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
@@ -235,7 +240,7 @@ function Bookings() {
             ))}
             {!bookings.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="8">
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="9">
                   {loading ? "Loading bookings..." : "No bookings found."}
                 </td>
               </tr>

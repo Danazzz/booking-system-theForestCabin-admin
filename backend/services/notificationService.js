@@ -47,6 +47,10 @@ const formatDate = (value) => {
   return value ? new Date(value).toISOString().slice(0, 10) : "-";
 };
 
+const getPromoLabel = (booking) => {
+  return booking.promoId?.name || booking.promo || booking.promoCode || "-";
+};
+
 export const notifyBookingSuccessful = async (booking) => {
   const lines = [
     "Booking successful",
@@ -55,7 +59,7 @@ export const notifyBookingSuccessful = async (booking) => {
     `Check-in: ${formatDate(booking.checkIn)}`,
     `Check-out: ${formatDate(booking.checkOut)}`,
     `Rooms: ${booking.roomCount || "-"}`,
-    `Promo: ${booking.promo || booking.promoCode || "-"}`,
+    `Promo: ${getPromoLabel(booking)}`,
     `Notes: ${booking.notes || "-"}`
   ];
 
