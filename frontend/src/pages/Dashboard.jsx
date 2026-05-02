@@ -13,7 +13,9 @@ function Dashboard() {
   const [availability, setAvailability] = useState(null);
   const [alerts, setAlerts] = useState([]);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [testLoading, setTestLoading] = useState(false);
 
   const fetchAlerts = async () => {
     const response = await api.get("/alerts");
@@ -54,6 +56,7 @@ function Dashboard() {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    setMessage("");
     setLoading(true);
 
     try {
@@ -67,11 +70,40 @@ function Dashboard() {
     }
   };
 
+  const sendTestNotification = async () => {
+    setError("");
+    setMessage("");
+    setTestLoading(true);
+
+    try {
+      const response = await api.post("/notifications/test");
+      const sent = response.data.data?.sent;
+
+      setMessage(sent
+        ? "Test email sent. Check the admin phone."
+        : response.data.message || "Test email skipped. Check backend email config.");
+    } catch (err) {
+      setError(err.response?.data?.error || "Failed to send test notification");
+    } finally {
+      setTestLoading(false);
+    }
+  };
+
   return (
     <section className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="mt-1 text-sm text-gray-500">Availability summary and active alerts.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Dashboard</h1>
+          <p className="mt-1 text-sm text-gray-500">Availability summary and active alerts.</p>
+        </div>
+        <button
+          type="button"
+          onClick={sendTestNotification}
+          disabled={testLoading}
+          className="min-h-11 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 disabled:text-gray-400"
+        >
+          {testLoading ? "Sending..." : "Send test email"}
+        </button>
       </div>
 
       <form className="grid gap-3 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-4" onSubmit={handleSubmit}>
@@ -109,6 +141,7 @@ function Dashboard() {
       </form>
 
       {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+      {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
 
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard label="Total rooms" value={availability?.totalRooms} />

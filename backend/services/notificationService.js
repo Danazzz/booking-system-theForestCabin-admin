@@ -4,6 +4,10 @@ const hasSmtpConfig = () => {
   return Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
 };
 
+export const isEmailNotificationConfigured = () => {
+  return Boolean(hasSmtpConfig() && process.env.ADMIN_EMAIL);
+};
+
 const createTransporter = () => {
   if (!hasSmtpConfig()) {
     return null;
@@ -51,9 +55,21 @@ const getPromoLabel = (booking) => {
   return booking.promoId?.name || booking.promo || booking.promoCode || "-";
 };
 
+const getRoomLabel = (value) => {
+  return value?.name || value?.code || value || "-";
+};
+
+const getDateRange = ({ checkIn, checkOut }) => {
+  return `${formatDate(checkIn)} to ${formatDate(checkOut)}`;
+};
+
 export const notifyBookingSuccessful = async (booking) => {
+  const dateRange = getDateRange(booking);
+  const preview = `BOOKING: ${booking.guestName || "Guest"} from ${booking.sourceName || booking.source || "source"} for ${dateRange}.`;
   const lines = [
-    "Booking successful",
+    preview,
+    "",
+    "Booking details",
     `Guest: ${booking.guestName || "-"}`,
     `Source: ${booking.sourceName || booking.source || "-"}`,
     `Check-in: ${formatDate(booking.checkIn)}`,
@@ -64,24 +80,56 @@ export const notifyBookingSuccessful = async (booking) => {
   ];
 
   return sendEmailNotification({
-    subject: "Booking successful",
+    subject: `[FOREST CABIN BOOKING] ${booking.guestName || "New Booking"} - ${dateRange}`,
     text: lines.join("\n")
   });
 };
 
 export const notifyAlertCreated = async (alert) => {
+  const severity = String(alert.severity || "warning").toUpperCase();
+  const metadata = alert.metadata || {};
+  const dateRange = getDateRange({
+    checkIn: metadata.checkIn,
+    checkOut: metadata.checkOut
+  });
+  const preview = `${severity}: ${alert.message}${dateRange !== "- to -" ? ` (${dateRange})` : ""}.`;
   const lines = [
+    preview,
+    "",
+    "Alert details",
     `Alert: ${alert.type}`,
     `Severity: ${alert.severity}`,
     `Message: ${alert.message}`,
-    `Room: ${alert.roomId || "-"}`,
-    `Details: ${JSON.stringify(alert.metadata || {}, null, 2)}`
+    `Room: ${getRoomLabel(alert.roomId)}`,
+    `Source: ${metadata.sourceName || "-"}`,
+    `Available rooms: ${metadata.availableRooms ?? "-"}`,
+    `Requested rooms: ${metadata.requestedRooms ?? "-"}`,
+    `Details: ${JSON.stringify(metadata, null, 2)}`
   ];
 
   return sendEmailNotification({
-    subject: `Booking alert: ${alert.type}`,
+    subject: `[FOREST CABIN ${severity}] ${alert.type}`,
     text: lines.join("\n")
   });
+};
+
+export const sendTestEmailNotification = async () => {
+  const preview = "TEST: Forest Cabin admin email notifications are working.";
+  const result = await sendEmailNotification({
+    subject: "[FOREST CABIN TEST] Admin Email Notification",
+    text: [
+      preview,
+      "",
+      "If this appeared on the admin phone, email alerts are ready.",
+      `Sent at: ${new Date().toISOString()}`
+    ].join("\n")
+  });
+
+  return {
+    sent: Boolean(result),
+    configured: isEmailNotificationConfigured(),
+    messageId: result?.messageId
+  };
 };
 
 export const pushNotificationBlueprint = {
