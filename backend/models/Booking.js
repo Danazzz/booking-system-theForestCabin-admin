@@ -11,6 +11,11 @@ const bookingSchema = new mongoose.Schema(
       ref: "Room",
       required: true
     },
+    roomIds: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Room",
+      index: true
+    }],
     channelId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Channel",

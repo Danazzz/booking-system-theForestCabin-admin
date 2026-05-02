@@ -5,6 +5,7 @@ const emptyForm = {
   name: "",
   code: "",
   maxGuestsPerUnit: "",
+  basePrice: "",
   isActive: true
 };
 
@@ -68,7 +69,8 @@ function Rooms() {
     const payload = {
       ...form,
       totalUnits: 1,
-      maxGuestsPerUnit: form.maxGuestsPerUnit ? Number(form.maxGuestsPerUnit) : undefined
+      maxGuestsPerUnit: form.maxGuestsPerUnit ? Number(form.maxGuestsPerUnit) : undefined,
+      basePrice: form.basePrice ? Number(form.basePrice) : 0
     };
 
     if (!payload.maxGuestsPerUnit) {
@@ -101,6 +103,7 @@ function Rooms() {
       name: room.name || "",
       code: room.code || "",
       maxGuestsPerUnit: room.maxGuestsPerUnit || "",
+      basePrice: room.basePrice || "",
       isActive: Boolean(room.isActive)
     });
   };
@@ -133,6 +136,7 @@ function Rooms() {
         <input name="name" value={form.name} onChange={handleChange} required placeholder="Room type, e.g. Superior" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="code" value={form.code} onChange={handleChange} required placeholder="Room number, e.g. 101" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="maxGuestsPerUnit" type="number" min="1" value={form.maxGuestsPerUnit} onChange={handleChange} placeholder="Max guests per unit" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="basePrice" type="number" min="0" value={form.basePrice} onChange={handleChange} placeholder="Base price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input name="isActive" type="checkbox" checked={form.isActive} onChange={handleChange} />
           Active
@@ -153,12 +157,13 @@ function Rooms() {
       {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-md border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-[640px] divide-y divide-gray-200 text-sm">
+        <table className="min-w-[760px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-4 py-3">Room type</th>
               <th className="px-4 py-3">Room number</th>
               <th className="px-4 py-3">Guests</th>
+              <th className="px-4 py-3">Base price</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -169,6 +174,7 @@ function Rooms() {
                 <td className="px-4 py-3">{room.name}</td>
                 <td className="px-4 py-3">{room.code}</td>
                 <td className="px-4 py-3">{room.maxGuestsPerUnit || "-"}</td>
+                <td className="px-4 py-3">{room.basePrice ? Number(room.basePrice).toLocaleString() : "-"}</td>
                 <td className="px-4 py-3">{room.isActive ? "Active" : "Inactive"}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
@@ -180,7 +186,7 @@ function Rooms() {
             ))}
             {!rooms.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="5">No rooms found.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="6">No rooms found.</td>
               </tr>
             ) : null}
           </tbody>

@@ -9,6 +9,7 @@ const roomFields = [
   "code",
   "totalUnits",
   "maxGuestsPerUnit",
+  "basePrice",
   "isActive"
 ];
 
@@ -17,6 +18,7 @@ const updateFields = [
   "code",
   "totalUnits",
   "maxGuestsPerUnit",
+  "basePrice",
   "isActive"
 ];
 
@@ -48,6 +50,8 @@ const handleDuplicateRoom = (error) => {
 
 export const createRoom = async (payload) => {
   const data = pickFields(payload, roomFields);
+  data.totalUnits = data.totalUnits ?? 1;
+  data.basePrice = data.basePrice ?? 0;
 
   if (!data.name || !data.code || data.totalUnits === undefined) {
     throw new ValidationError("name, code, and totalUnits are required");
@@ -127,7 +131,10 @@ export const deleteRoom = async (roomId) => {
   }
 
   const activeBookings = await Booking.countDocuments({
-    roomId,
+    $or: [
+      { roomId },
+      { roomIds: roomId }
+    ],
     status: { $in: ["pending", "confirmed"] }
   });
 

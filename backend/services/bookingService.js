@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import Channel from "../models/Channel.js";
+import Room from "../models/Room.js";
 import { ensureActivePromo } from "./promoService.js";
 import { ensureAvailability, parseStayDates } from "./availabilityService.js";
 import { createOverbookingAttemptAlert } from "./alertService.js";
@@ -28,6 +29,7 @@ const parseRoomCount = (roomCount) => {
 
 const bookingUpdateFields = [
   "roomId",
+  "roomIds",
   "channelId",
   "sourceName",
   "source",
@@ -94,9 +96,51 @@ const resolvePromoId = async (promoId) => {
 const populateBooking = (booking) => {
   return Booking.findById(booking._id)
     .populate("propertyId", "name timezone")
-    .populate("roomId", "name code totalUnits")
+    .populate("roomId", "name code totalUnits basePrice")
+    .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
     .populate("promoId", "name description isActive");
+};
+
+const normalizeRoomIds = (payload) => {
+  const ids = Array.isArray(payload.roomIds) && payload.roomIds.length > 0
+    ? payload.roomIds
+    : [payload.roomId].filter(Boolean);
+
+  if (ids.length === 0) {
+    throw new ValidationError("At least one room must be selected");
+  }
+
+  const uniqueIds = [...new Set(ids.map((id) => String(id)))];
+
+  for (const id of uniqueIds) {
+    validateObjectId(id, "roomId");
+  }
+
+  return uniqueIds;
+};
+
+const resolveRooms = async ({ propertyId, roomIds }) => {
+  const query = {
+    _id: { $in: roomIds },
+    isActive: true
+  };
+
+  if (propertyId) {
+    query.propertyId = propertyId;
+  }
+
+  const rooms = await Room.find(query);
+
+  if (rooms.length !== roomIds.length) {
+    throw new ValidationError("One or more selected rooms are not available");
+  }
+
+  return rooms;
+};
+
+const calculateRoomPrice = (rooms) => {
+  return rooms.reduce((sum, room) => sum + Number(room.basePrice || 0), 0);
 };
 
 const resolveChannel = async ({
@@ -167,6 +211,7 @@ const sourceIdentityQuery = (channel) => ({
 const ensureBookingAvailability = async ({
   propertyId,
   roomId,
+  roomIds,
   checkIn,
   checkOut,
   roomCount,
@@ -178,6 +223,7 @@ const ensureBookingAvailability = async ({
     return await ensureAvailability({
       propertyId,
       roomId,
+      roomIds,
       checkIn,
       checkOut,
       roomCount,
@@ -187,7 +233,7 @@ const ensureBookingAvailability = async ({
     if (error.name === "BookingConflictError") {
       await createOverbookingAttemptAlert({
         propertyId,
-        roomId,
+        roomId: error.details?.roomId || roomId,
         channel,
         checkIn,
         checkOut,
@@ -214,18 +260,24 @@ const addGoogleCalendarEvent = async (booking) => {
 export const createBooking = async (payload) => {
   const { checkIn, checkOut } = parseStayDates(payload);
   validateNotes(payload.notes);
+  const roomIds = normalizeRoomIds(payload);
+  const rooms = await resolveRooms({
+    propertyId: payload.propertyId,
+    roomIds
+  });
   const channel = await resolveChannel({
     propertyId: payload.propertyId,
     channelId: payload.channelId,
     sourceName: payload.sourceName,
     source: payload.source
   });
-  const roomCount = parseRoomCount(payload.roomCount);
+  const roomCount = roomIds.length;
   const promoId = await resolvePromoId(payload.promoId);
 
   await ensureBookingAvailability({
     propertyId: payload.propertyId,
-    roomId: payload.roomId,
+    roomId: roomIds[0],
+    roomIds,
     checkIn,
     checkOut,
     roomCount,
@@ -236,7 +288,8 @@ export const createBooking = async (payload) => {
   try {
     const booking = await Booking.create({
       propertyId: payload.propertyId,
-      roomId: payload.roomId,
+      roomId: roomIds[0],
+      roomIds,
       ...getBookingChannelFields(channel),
       externalId: payload.externalId,
       guestName: payload.guestName,
@@ -244,7 +297,7 @@ export const createBooking = async (payload) => {
       roomCount,
       checkIn,
       checkOut,
-      price: payload.price,
+      price: payload.price ?? calculateRoomPrice(rooms),
       promoId,
       promo: payload.promo,
       promoCode: payload.promoCode,
@@ -270,7 +323,15 @@ export const updateExistingBooking = async (booking, payload) => {
     checkIn: payload.checkIn ?? booking.checkIn,
     checkOut: payload.checkOut ?? booking.checkOut
   });
-  const roomCount = parseRoomCount(payload.roomCount ?? booking.roomCount);
+  const roomIds = normalizeRoomIds({
+    roomIds: payload.roomIds ?? booking.roomIds,
+    roomId: payload.roomId ?? booking.roomId
+  });
+  const rooms = await resolveRooms({
+    propertyId: booking.propertyId,
+    roomIds
+  });
+  const roomCount = roomIds.length;
   const promoId = await resolvePromoId(payload.promoId);
   const hasChannelInput = payload.channelId || payload.sourceName || payload.source;
   const channel = await resolveChannel({
@@ -282,7 +343,8 @@ export const updateExistingBooking = async (booking, payload) => {
 
   await ensureBookingAvailability({
     propertyId: booking.propertyId,
-    roomId: payload.roomId || booking.roomId,
+    roomId: roomIds[0],
+    roomIds,
     checkIn,
     checkOut,
     roomCount,
@@ -291,7 +353,8 @@ export const updateExistingBooking = async (booking, payload) => {
     rawPayload: payload
   });
 
-  booking.roomId = payload.roomId || booking.roomId;
+  booking.roomId = roomIds[0];
+  booking.roomIds = roomIds;
   applyChannelToBooking(booking, channel);
   booking.guestName = payload.guestName ?? booking.guestName;
   booking.guestCount = payload.guestCount ?? booking.guestCount;
@@ -299,7 +362,7 @@ export const updateExistingBooking = async (booking, payload) => {
   booking.roomCount = roomCount;
   booking.checkIn = checkIn;
   booking.checkOut = checkOut;
-  booking.price = payload.price ?? booking.price;
+  booking.price = payload.price ?? calculateRoomPrice(rooms);
   if (promoId !== undefined) {
     booking.promoId = promoId;
   }
@@ -333,7 +396,12 @@ export const listBookings = async (filters = {}) => {
   const query = {};
 
   if (filters.propertyId) query.propertyId = filters.propertyId;
-  if (filters.roomId) query.roomId = filters.roomId;
+  if (filters.roomId) {
+    query.$or = [
+      { roomId: filters.roomId },
+      { roomIds: filters.roomId }
+    ];
+  }
   if (filters.channelId) query.channelId = filters.channelId;
   if (filters.promoId) query.promoId = filters.promoId;
   if (filters.source) query.source = filters.source;
@@ -341,7 +409,8 @@ export const listBookings = async (filters = {}) => {
 
   return Booking.find(query)
     .populate("propertyId", "name timezone")
-    .populate("roomId", "name code totalUnits")
+    .populate("roomId", "name code totalUnits basePrice")
+    .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
     .populate("promoId", "name description isActive")
     .sort({ checkIn: 1, createdAt: 1 });
@@ -352,7 +421,8 @@ export const getBookingById = async (bookingId) => {
 
   const booking = await Booking.findById(bookingId)
     .populate("propertyId", "name timezone")
-    .populate("roomId", "name code totalUnits")
+    .populate("roomId", "name code totalUnits basePrice")
+    .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
     .populate("promoId", "name description isActive");
 
@@ -602,6 +672,7 @@ export const syncBookings = async ({
       const newBooking = new Booking({
         propertyId,
         roomId,
+        roomIds: [roomId],
         ...getBookingChannelFields(channel),
         externalId: event.uid,
         guestName: event.summary,
@@ -649,6 +720,7 @@ export const syncBookings = async ({
         }
 
         existing.roomId = roomId;
+        existing.roomIds = [roomId];
         applyChannelToBooking(existing, channel);
         existing.checkIn = checkIn;
         existing.checkOut = checkOut;

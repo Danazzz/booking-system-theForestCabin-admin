@@ -25,6 +25,11 @@ const roomSchema = new mongoose.Schema(
       type: Number,
       min: 1
     },
+    basePrice: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
     isActive: {
       type: Boolean,
       default: true

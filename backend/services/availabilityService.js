@@ -48,14 +48,17 @@ export const getAvailability = async ({
     roomQuery.propertyId = propertyObjectId;
   }
 
-  const room = await Room.findOne(roomQuery);
+const room = await Room.findOne(roomQuery);
 
   if (!room) {
     throw new NotFoundError("Room not found");
   }
 
   const overlapQuery = {
-    roomId: roomObjectId,
+    $or: [
+      { roomId: roomObjectId },
+      { roomIds: roomObjectId }
+    ],
     status: "confirmed",
     checkIn: { $lt: checkOut },
     checkOut: { $gt: checkIn }
@@ -73,12 +76,7 @@ export const getAvailability = async ({
     overlapQuery._id = { $ne: new mongoose.Types.ObjectId(excludeBookingId) };
   }
 
-  const [usage] = await Booking.aggregate([
-    { $match: overlapQuery },
-    { $group: { _id: null, bookedRooms: { $sum: "$roomCount" } } }
-  ]);
-
-  const bookedRooms = usage?.bookedRooms || 0;
+  const bookedRooms = await Booking.countDocuments(overlapQuery);
   const availableRooms = Math.max(room.totalUnits - bookedRooms, 0);
 
   const availability = {
@@ -100,34 +98,61 @@ export const getAvailability = async ({
 export const ensureAvailability = async ({
   propertyId,
   roomId,
+  roomIds,
   checkIn,
   checkOut,
   roomCount,
   excludeBookingId = null
 }) => {
+  const roomsToCheck = Array.isArray(roomIds) && roomIds.length > 0
+    ? roomIds
+    : [roomId];
+
+  if (roomsToCheck.some((id) => !id)) {
+    throw new ValidationError("roomId is required");
+  }
+
   if (!Number.isInteger(roomCount) || roomCount < 1) {
     throw new ValidationError("roomCount must be a positive integer");
   }
 
-  const availability = await getAvailability({
-    propertyId,
-    roomId,
-    checkIn,
-    checkOut,
-    excludeBookingId
-  });
+  const availabilityResults = [];
 
-  if (roomCount > availability.availableRooms) {
-    throw new BookingConflictError(
-      "Not enough rooms available for the requested dates",
-      {
-        requestedRooms: roomCount,
-        availableRooms: availability.availableRooms,
-        totalRooms: availability.totalRooms,
-        bookedRooms: availability.bookedRooms
-      }
-    );
+  for (const currentRoomId of roomsToCheck) {
+    const availability = await getAvailability({
+      propertyId,
+      roomId: currentRoomId,
+      checkIn,
+      checkOut,
+      excludeBookingId
+    });
+
+    availabilityResults.push(availability);
+
+    if (availability.availableRooms < 1) {
+      throw new BookingConflictError(
+        "Not enough rooms available for the requested dates",
+        {
+          requestedRooms: 1,
+          availableRooms: availability.availableRooms,
+          totalRooms: availability.totalRooms,
+          bookedRooms: availability.bookedRooms,
+          roomId: currentRoomId
+        }
+      );
+    }
   }
 
-  return availability;
+  if (roomsToCheck.length !== roomCount) {
+    throw new ValidationError("roomCount must match selected rooms");
+  }
+
+  return availabilityResults.length === 1 ? availabilityResults[0] : {
+    roomIds: roomsToCheck,
+    totalRooms: availabilityResults.reduce((sum, item) => sum + item.totalRooms, 0),
+    bookedRooms: availabilityResults.reduce((sum, item) => sum + item.bookedRooms, 0),
+    availableRooms: availabilityResults.reduce((sum, item) => sum + item.availableRooms, 0),
+    checkIn,
+    checkOut
+  };
 };

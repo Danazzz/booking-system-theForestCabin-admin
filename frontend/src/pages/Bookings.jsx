@@ -2,13 +2,11 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 
 const emptyForm = {
-  roomId: "",
+  roomIds: [],
   channelId: "",
-  sourceName: "",
   externalId: "",
   guestName: "",
   guestCount: "",
-  roomCount: "",
   checkIn: "",
   checkOut: "",
   price: "",
@@ -46,6 +44,8 @@ const cleanPayload = (form) => {
 
 function Bookings() {
   const [bookings, setBookings] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [promos, setPromos] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
@@ -63,13 +63,17 @@ function Bookings() {
 
     const loadInitialBookings = async () => {
       try {
-        const [bookingsResponse, promosResponse] = await Promise.all([
+        const [bookingsResponse, roomsResponse, channelsResponse, promosResponse] = await Promise.all([
           api.get("/bookings"),
+          api.get("/rooms"),
+          api.get("/channels", { params: { isActive: true } }),
           api.get("/promos", { params: { isActive: true } })
         ]);
 
         if (!ignore) {
           setBookings(bookingsResponse.data.data || []);
+          setRooms((roomsResponse.data.data || []).filter((room) => room.isActive !== false));
+          setChannels((channelsResponse.data.data || []).filter((channel) => channel.isActive !== false));
           setPromos(promosResponse.data.data || []);
         }
       } catch (err) {
@@ -98,6 +102,26 @@ function Bookings() {
     }));
   };
 
+  const selectedRooms = rooms.filter((room) => form.roomIds.includes(room._id));
+  const calculatedPrice = selectedRooms.reduce((sum, room) => sum + Number(room.basePrice || 0), 0);
+
+  const handleRoomToggle = (roomId) => {
+    setForm((current) => {
+      const exists = current.roomIds.includes(roomId);
+      const roomIds = exists
+        ? current.roomIds.filter((id) => id !== roomId)
+        : [...current.roomIds, roomId];
+      const nextSelectedRooms = rooms.filter((room) => roomIds.includes(room._id));
+      const nextPrice = nextSelectedRooms.reduce((sum, room) => sum + Number(room.basePrice || 0), 0);
+
+      return {
+        ...current,
+        roomIds,
+        price: String(nextPrice)
+      };
+    });
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
@@ -105,8 +129,14 @@ function Bookings() {
     setLoading(true);
 
     try {
+      if (form.roomIds.length === 0) {
+        throw new Error("Select at least one room");
+      }
+
       const payload = cleanPayload(form);
       payload.promoId = form.promoId || null;
+      payload.roomIds = form.roomIds;
+      payload.roomCount = form.roomIds.length;
 
       if (editingId) {
         await api.patch(`/bookings/${editingId}`, payload);
@@ -119,22 +149,36 @@ function Bookings() {
       resetForm();
       await loadBookings();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to save booking");
+      setError(err.response?.data?.error || err.message || "Failed to save booking");
     } finally {
       setLoading(false);
     }
   };
 
+  const formatBookingRooms = (booking) => {
+    const bookingRooms = booking.roomIds?.length ? booking.roomIds : [booking.roomId].filter(Boolean);
+
+    return bookingRooms.map((room) => {
+      if (typeof room === "string") {
+        return room;
+      }
+
+      return [room.name, room.code].filter(Boolean).join(" ");
+    }).join(", ") || "-";
+  };
+
   const editBooking = (booking) => {
     setEditingId(booking._id);
+    const bookingRoomIds = booking.roomIds?.length
+      ? booking.roomIds.map((room) => room._id || room)
+      : [booking.roomId?._id || booking.roomId].filter(Boolean);
+
     setForm({
-      roomId: booking.roomId?._id || booking.roomId || "",
+      roomIds: bookingRoomIds,
       channelId: booking.channelId?._id || booking.channelId || "",
-      sourceName: booking.sourceName || booking.source || "",
       externalId: booking.externalId || "",
       guestName: booking.guestName || "",
       guestCount: booking.guestCount || "",
-      roomCount: booking.roomCount || "",
       checkIn: toDateInput(booking.checkIn),
       checkOut: toDateInput(booking.checkOut),
       price: booking.price || "",
@@ -170,16 +214,36 @@ function Bookings() {
       </div>
 
       <form className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-4" onSubmit={handleSubmit}>
-        <input name="roomId" value={form.roomId} onChange={handleChange} required placeholder="Room ID" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="channelId" value={form.channelId} onChange={handleChange} placeholder="Channel ID" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="sourceName" value={form.sourceName} onChange={handleChange} required placeholder="Channel name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <div className="rounded-md border border-gray-300 p-3 md:col-span-2">
+          <p className="text-sm font-medium text-gray-700">Rooms</p>
+          <div className="mt-2 grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+            {rooms.map((room) => (
+              <label key={room._id} className="flex min-h-10 items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.roomIds.includes(room._id)}
+                  onChange={() => handleRoomToggle(room._id)}
+                />
+                <span>{room.name} {room.code}</span>
+              </label>
+            ))}
+            {!rooms.length ? <p className="text-sm text-gray-500">No active rooms.</p> : null}
+          </div>
+        </div>
+        <select name="channelId" value={form.channelId} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+          <option value="">Select source</option>
+          {channels.map((channel) => (
+            <option key={channel._id} value={channel._id}>{channel.name}</option>
+          ))}
+        </select>
         <input name="guestName" value={form.guestName} onChange={handleChange} placeholder="Guest name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="guestCount" type="number" min="1" value={form.guestCount} onChange={handleChange} placeholder="Guest count" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="roomCount" type="number" min="1" value={form.roomCount} onChange={handleChange} required placeholder="Room count" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="externalId" value={form.externalId} onChange={handleChange} placeholder="External ID" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input value={`${form.roomIds.length} room${form.roomIds.length === 1 ? "" : "s"} selected`} readOnly className="min-h-11 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none" />
+        <input name="externalId" value={form.externalId} onChange={handleChange} placeholder="OTA booking code (optional)" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="checkIn" type="date" value={form.checkIn} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="checkOut" type="date" value={form.checkOut} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="price" type="number" min="0" value={form.price} onChange={handleChange} placeholder="Price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <p className="self-center text-sm text-gray-500">Base total: {calculatedPrice.toLocaleString()}</p>
         <select name="promoId" value={form.promoId} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
           <option value="">No promo</option>
           {promos.map((promo) => (
@@ -223,7 +287,7 @@ function Bookings() {
             {bookings.map((booking) => (
               <tr key={booking._id}>
                 <td className="px-4 py-3">{booking.guestName || "-"}</td>
-                <td className="px-4 py-3">{booking.roomId?.name || booking.roomId || "-"}</td>
+                <td className="px-4 py-3">{formatBookingRooms(booking)}</td>
                 <td className="px-4 py-3">{booking.sourceName || booking.source || "-"}</td>
                 <td className="px-4 py-3">{booking.checkIn ? new Date(booking.checkIn).toLocaleDateString() : "-"}</td>
                 <td className="px-4 py-3">{booking.checkOut ? new Date(booking.checkOut).toLocaleDateString() : "-"}</td>
