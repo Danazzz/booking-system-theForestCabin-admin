@@ -4,7 +4,6 @@ import api from "../api/axios";
 const emptyForm = {
   name: "",
   code: "",
-  totalUnits: "",
   maxGuestsPerUnit: "",
   isActive: true
 };
@@ -68,7 +67,7 @@ function Rooms() {
 
     const payload = {
       ...form,
-      totalUnits: Number(form.totalUnits),
+      totalUnits: 1,
       maxGuestsPerUnit: form.maxGuestsPerUnit ? Number(form.maxGuestsPerUnit) : undefined
     };
 
@@ -79,6 +78,7 @@ function Rooms() {
     try {
       if (editingId) {
         const updates = { ...payload };
+        delete updates.totalUnits;
         await api.patch(`/rooms/${editingId}`, updates);
         setMessage("Room updated");
       } else {
@@ -100,7 +100,6 @@ function Rooms() {
     setForm({
       name: room.name || "",
       code: room.code || "",
-      totalUnits: room.totalUnits || "",
       maxGuestsPerUnit: room.maxGuestsPerUnit || "",
       isActive: Boolean(room.isActive)
     });
@@ -127,13 +126,12 @@ function Rooms() {
     <section className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Rooms</h1>
-        <p className="mt-1 text-sm text-gray-500">Create room types and manage room capacity.</p>
+        <p className="mt-1 text-sm text-gray-500">Create physical rooms and assign room numbers.</p>
       </div>
 
       <form className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-3" onSubmit={handleSubmit}>
-        <input name="name" value={form.name} onChange={handleChange} required placeholder="Room name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="code" value={form.code} onChange={handleChange} required placeholder="Code" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="totalUnits" type="number" min="1" value={form.totalUnits} onChange={handleChange} required placeholder="Total units" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="name" value={form.name} onChange={handleChange} required placeholder="Room type, e.g. Superior" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="code" value={form.code} onChange={handleChange} required placeholder="Room number, e.g. 101" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="maxGuestsPerUnit" type="number" min="1" value={form.maxGuestsPerUnit} onChange={handleChange} placeholder="Max guests per unit" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input name="isActive" type="checkbox" checked={form.isActive} onChange={handleChange} />
@@ -155,12 +153,11 @@ function Rooms() {
       {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-md border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-[720px] divide-y divide-gray-200 text-sm">
+        <table className="min-w-[640px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Code</th>
-              <th className="px-4 py-3">Units</th>
+              <th className="px-4 py-3">Room type</th>
+              <th className="px-4 py-3">Room number</th>
               <th className="px-4 py-3">Guests</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Actions</th>
@@ -171,7 +168,6 @@ function Rooms() {
               <tr key={room._id}>
                 <td className="px-4 py-3">{room.name}</td>
                 <td className="px-4 py-3">{room.code}</td>
-                <td className="px-4 py-3">{room.totalUnits}</td>
                 <td className="px-4 py-3">{room.maxGuestsPerUnit || "-"}</td>
                 <td className="px-4 py-3">{room.isActive ? "Active" : "Inactive"}</td>
                 <td className="px-4 py-3">
@@ -184,7 +180,7 @@ function Rooms() {
             ))}
             {!rooms.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="6">No rooms found.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="5">No rooms found.</td>
               </tr>
             ) : null}
           </tbody>
