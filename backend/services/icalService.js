@@ -1,11 +1,69 @@
 import ical from "node-ical";
+import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
+import Channel from "../models/Channel.js";
 import Config from "../models/Config.js";
 import IcalSource from "../models/IcalSource.js";
+import Room from "../models/Room.js";
 import { createSyncDelayAlert } from "./alertService.js";
 import { createBooking } from "./bookingService.js";
 import { BookingConflictError, NotFoundError, ValidationError } from "./bookingErrors.js";
 import { parseStayDates } from "./availabilityService.js";
+
+const icalSourceFields = [
+  "propertyId",
+  "url",
+  "icalUrl",
+  "roomId",
+  "channelId",
+  "sourceName",
+  "roomCount",
+  "isActive"
+];
+
+const validateObjectId = (id, fieldName = "id") => {
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    throw new ValidationError(`${fieldName} must be a valid MongoDB ObjectId`);
+  }
+};
+
+const pickFields = (payload, fields) => {
+  const data = {};
+
+  for (const field of fields) {
+    if (payload[field] !== undefined) {
+      data[field] = payload[field];
+    }
+  }
+
+  return data;
+};
+
+const validateIcalUrl = (url) => {
+  if (!url) {
+    throw new ValidationError("iCal source url is required");
+  }
+
+  const value = String(url).trim().toLowerCase();
+
+  if (!/^https?:\/\//.test(value) || !value.includes(".ics")) {
+    throw new ValidationError("iCal URL must start with http:// or https:// and contain .ics");
+  }
+};
+
+const parseRoomCount = (roomCount) => {
+  if (roomCount === undefined || roomCount === null || roomCount === "") {
+    throw new ValidationError("roomCount is required");
+  }
+
+  const parsedRoomCount = Number(roomCount);
+
+  if (!Number.isInteger(parsedRoomCount) || parsedRoomCount < 1) {
+    throw new ValidationError("roomCount must be a positive integer");
+  }
+
+  return parsedRoomCount;
+};
 
 export const fetchIcalData = async (url) => {
   if (!url) {
@@ -25,6 +83,186 @@ const getSourceUrl = (icalSource) => {
 
 const getEventExternalId = (event) => {
   return event.uid || event.id;
+};
+
+const resolveRoom = async ({ roomId, propertyId }) => {
+  if (!roomId) {
+    throw new ValidationError("roomId is required");
+  }
+
+  validateObjectId(roomId, "roomId");
+
+  const query = {
+    _id: roomId,
+    isActive: true
+  };
+
+  if (propertyId) {
+    validateObjectId(propertyId, "propertyId");
+    query.propertyId = propertyId;
+  }
+
+  const room = await Room.findOne(query);
+
+  if (!room) {
+    throw new ValidationError("Active room is not configured");
+  }
+
+  return room;
+};
+
+const resolveChannel = async ({ channelId, sourceName, propertyId }) => {
+  const query = {
+    isActive: true
+  };
+
+  if (propertyId) {
+    validateObjectId(propertyId, "propertyId");
+    query.propertyId = propertyId;
+  }
+
+  if (channelId) {
+    validateObjectId(channelId, "channelId");
+    query._id = channelId;
+  } else if (sourceName) {
+    query.name = sourceName;
+  } else {
+    throw new ValidationError("channelId or sourceName is required");
+  }
+
+  const channel = await Channel.findOne(query);
+
+  if (!channel) {
+    throw new ValidationError("Active booking channel is not configured");
+  }
+
+  return channel;
+};
+
+const buildIcalSourceData = async (payload) => {
+  const data = pickFields(payload, icalSourceFields);
+  const url = data.url || data.icalUrl;
+
+  validateIcalUrl(url);
+  await resolveRoom({
+    roomId: data.roomId,
+    propertyId: data.propertyId
+  });
+
+  const channel = await resolveChannel({
+    channelId: data.channelId,
+    sourceName: data.sourceName,
+    propertyId: data.propertyId
+  });
+
+  return {
+    ...data,
+    url,
+    icalUrl: data.icalUrl || url,
+    channelId: channel._id,
+    sourceName: channel.name,
+    roomCount: parseRoomCount(data.roomCount)
+  };
+};
+
+export const createIcalSource = async (payload) => {
+  const data = await buildIcalSourceData(payload);
+
+  return IcalSource.create(data);
+};
+
+export const listIcalSources = async (filters = {}) => {
+  const query = {};
+
+  if (filters.propertyId) {
+    validateObjectId(filters.propertyId, "propertyId");
+    query.propertyId = filters.propertyId;
+  }
+
+  if (filters.roomId) {
+    validateObjectId(filters.roomId, "roomId");
+    query.roomId = filters.roomId;
+  }
+
+  if (filters.channelId) {
+    validateObjectId(filters.channelId, "channelId");
+    query.channelId = filters.channelId;
+  }
+
+  if (filters.isActive !== undefined) {
+    query.isActive = filters.isActive === "true" || filters.isActive === true;
+  }
+
+  return IcalSource.find(query)
+    .populate("roomId", "name code totalUnits")
+    .populate("channelId", "name type isActive")
+    .sort({ isActive: -1, sourceName: 1, createdAt: -1 });
+};
+
+export const getIcalSourceById = async (sourceId) => {
+  validateObjectId(sourceId, "icalSourceId");
+
+  const source = await IcalSource.findById(sourceId)
+    .populate("roomId", "name code totalUnits")
+    .populate("channelId", "name type isActive");
+
+  if (!source) {
+    throw new NotFoundError("iCal source not found");
+  }
+
+  return source;
+};
+
+export const updateIcalSource = async (sourceId, payload) => {
+  validateObjectId(sourceId, "icalSourceId");
+
+  const existing = await IcalSource.findById(sourceId);
+
+  if (!existing) {
+    throw new NotFoundError("iCal source not found");
+  }
+
+  const merged = {
+    propertyId: existing.propertyId,
+    url: existing.url,
+    icalUrl: existing.icalUrl,
+    roomId: existing.roomId,
+    channelId: existing.channelId,
+    sourceName: existing.sourceName,
+    roomCount: existing.roomCount,
+    isActive: existing.isActive,
+    ...pickFields(payload, icalSourceFields)
+  };
+
+  const updates = await buildIcalSourceData(merged);
+
+  const source = await IcalSource.findByIdAndUpdate(
+    sourceId,
+    { $set: updates },
+    { new: true, runValidators: true }
+  )
+    .populate("roomId", "name code totalUnits")
+    .populate("channelId", "name type isActive");
+
+  return source;
+};
+
+export const deleteIcalSource = async (sourceId) => {
+  validateObjectId(sourceId, "icalSourceId");
+
+  const source = await IcalSource.findByIdAndUpdate(
+    sourceId,
+    { $set: { isActive: false } },
+    { new: true, runValidators: true }
+  )
+    .populate("roomId", "name code totalUnits")
+    .populate("channelId", "name type isActive");
+
+  if (!source) {
+    throw new NotFoundError("iCal source not found");
+  }
+
+  return source;
 };
 
 const getDuplicateQuery = (bookingPayload) => {
