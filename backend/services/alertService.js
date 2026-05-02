@@ -36,7 +36,6 @@ export const getActiveAlerts = async (filters = {}) => {
   if (filters.type) query.type = filters.type;
 
   return Alert.find(query)
-    .populate("propertyId", "name timezone")
     .populate("roomId", "name code")
     .sort({ createdAt: -1 });
 };

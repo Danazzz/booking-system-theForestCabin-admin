@@ -64,9 +64,7 @@ export const listConfigs = async (filters = {}) => {
     query.propertyId = filters.propertyId;
   }
 
-  return Config.find(query)
-    .populate("propertyId", "name timezone")
-    .sort({ createdAt: -1 });
+  return Config.find(query).sort({ createdAt: -1 });
 };
 
 export const getConfig = async (propertyId) => {
@@ -86,7 +84,7 @@ export const getConfig = async (propertyId) => {
 export const getConfigById = async (configId) => {
   validateObjectId(configId, "configId");
 
-  const config = await Config.findById(configId).populate("propertyId", "name timezone");
+  const config = await Config.findById(configId);
 
   if (!config) {
     throw new NotFoundError("Config not found");

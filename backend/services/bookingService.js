@@ -95,7 +95,6 @@ const resolvePromoId = async (promoId) => {
 
 const populateBooking = (booking) => {
   return Booking.findById(booking._id)
-    .populate("propertyId", "name timezone")
     .populate("roomId", "name code totalUnits basePrice")
     .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
@@ -408,7 +407,6 @@ export const listBookings = async (filters = {}) => {
   if (filters.status) query.status = filters.status;
 
   return Booking.find(query)
-    .populate("propertyId", "name timezone")
     .populate("roomId", "name code totalUnits basePrice")
     .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
@@ -420,7 +418,6 @@ export const getBookingById = async (bookingId) => {
   validateObjectId(bookingId, "bookingId");
 
   const booking = await Booking.findById(bookingId)
-    .populate("propertyId", "name timezone")
     .populate("roomId", "name code totalUnits basePrice")
     .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
