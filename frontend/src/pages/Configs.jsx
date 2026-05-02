@@ -1,9 +1,16 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import SortHeader from "../components/SortHeader";
+import { useSortableData } from "../hooks/useSortableData";
 
 const emptyForm = {
   lowAvailabilityThreshold: "",
   syncDelayThresholdMinutes: ""
+};
+
+const configSortAccessors = {
+  lowAvailability: (config) => config.lowAvailabilityThreshold || 0,
+  syncDelay: (config) => config.syncDelayThresholdMinutes || 0
 };
 
 function Configs() {
@@ -13,6 +20,11 @@ function Configs() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const {
+    sortedItems: sortedConfigs,
+    sortConfig,
+    requestSort
+  } = useSortableData(configs, configSortAccessors, { key: "lowAvailability", direction: "asc" });
 
   const loadConfigs = async (params = {}) => {
     const response = await api.get("/configs", { params });
@@ -140,13 +152,13 @@ function Configs() {
         <table className="min-w-[640px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3">Low availability</th>
-              <th className="px-4 py-3">Sync delay</th>
+              <SortHeader label="Low availability" sortKey="lowAvailability" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Sync delay" sortKey="syncDelay" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {configs.map((config) => (
+            {sortedConfigs.map((config) => (
               <tr key={config._id}>
                 <td className="px-4 py-3">{config.lowAvailabilityThreshold}</td>
                 <td className="px-4 py-3">{config.syncDelayThresholdMinutes} min</td>

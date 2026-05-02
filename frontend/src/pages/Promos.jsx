@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import SortHeader from "../components/SortHeader";
+import { useSortableData } from "../hooks/useSortableData";
 
 const emptyForm = {
   name: "",
   description: "",
   isActive: true
+};
+
+const promoSortAccessors = {
+  name: (promo) => promo.name,
+  description: (promo) => promo.description || "",
+  status: (promo) => promo.isActive
 };
 
 function Promos() {
@@ -14,6 +22,11 @@ function Promos() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const {
+    sortedItems: sortedPromos,
+    sortConfig,
+    requestSort
+  } = useSortableData(promos, promoSortAccessors, { key: "name", direction: "asc" });
 
   const loadPromos = async () => {
     const response = await api.get("/promos");
@@ -146,14 +159,14 @@ function Promos() {
         <table className="min-w-[760px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Description</th>
-              <th className="px-4 py-3">Status</th>
+              <SortHeader label="Name" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Description" sortKey="description" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {promos.map((promo) => (
+            {sortedPromos.map((promo) => (
               <tr key={promo._id}>
                 <td className="px-4 py-3 font-medium">{promo.name}</td>
                 <td className="px-4 py-3">{promo.description || "-"}</td>

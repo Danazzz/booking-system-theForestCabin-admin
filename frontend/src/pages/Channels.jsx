@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import SortHeader from "../components/SortHeader";
+import { useSortableData } from "../hooks/useSortableData";
 
 const emptyForm = {
   name: "",
   type: "",
   isActive: true
+};
+
+const channelSortAccessors = {
+  name: (channel) => channel.name,
+  type: (channel) => channel.type,
+  status: (channel) => channel.isActive
 };
 
 function Channels() {
@@ -14,6 +22,11 @@ function Channels() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const {
+    sortedItems: sortedChannels,
+    sortConfig,
+    requestSort
+  } = useSortableData(channels, channelSortAccessors, { key: "name", direction: "asc" });
 
   const loadChannels = async (params = {}) => {
     const response = await api.get("/channels", { params });
@@ -142,14 +155,14 @@ function Channels() {
         <table className="min-w-[640px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Type</th>
-              <th className="px-4 py-3">Status</th>
+              <SortHeader label="Name" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Type" sortKey="type" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {channels.map((channel) => (
+            {sortedChannels.map((channel) => (
               <tr key={channel._id}>
                 <td className="px-4 py-3">{channel.name}</td>
                 <td className="px-4 py-3">{channel.type}</td>

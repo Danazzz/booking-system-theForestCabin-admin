@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import SortHeader from "../components/SortHeader";
+import { useSortableData } from "../hooks/useSortableData";
 
 const emptyForm = {
   roomIds: [],
@@ -42,6 +44,29 @@ const cleanPayload = (form) => {
   return payload;
 };
 
+const getBookingRoomsLabel = (booking) => {
+  const bookingRooms = booking.roomIds?.length ? booking.roomIds : [booking.roomId].filter(Boolean);
+
+  return bookingRooms.map((room) => {
+    if (typeof room === "string") {
+      return room;
+    }
+
+    return [room.name, room.code].filter(Boolean).join(" ");
+  }).join(", ") || "-";
+};
+
+const bookingSortAccessors = {
+  guest: (booking) => booking.guestName || "",
+  room: getBookingRoomsLabel,
+  source: (booking) => booking.sourceName || booking.source || "",
+  checkIn: (booking) => booking.checkIn,
+  checkOut: (booking) => booking.checkOut,
+  promo: (booking) => booking.promoId?.name || booking.promo || booking.promoCode || "",
+  notes: (booking) => booking.notes || "",
+  status: (booking) => booking.status || ""
+};
+
 function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -52,6 +77,11 @@ function Bookings() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const {
+    sortedItems: sortedBookings,
+    sortConfig,
+    requestSort
+  } = useSortableData(bookings, bookingSortAccessors, { key: "checkIn", direction: "asc" });
 
   const loadBookings = async (params = {}) => {
     const response = await api.get("/bookings", { params });
@@ -156,15 +186,7 @@ function Bookings() {
   };
 
   const formatBookingRooms = (booking) => {
-    const bookingRooms = booking.roomIds?.length ? booking.roomIds : [booking.roomId].filter(Boolean);
-
-    return bookingRooms.map((room) => {
-      if (typeof room === "string") {
-        return room;
-      }
-
-      return [room.name, room.code].filter(Boolean).join(" ");
-    }).join(", ") || "-";
+    return getBookingRoomsLabel(booking);
   };
 
   const editBooking = (booking) => {
@@ -272,19 +294,19 @@ function Bookings() {
         <table className="min-w-[1040px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3">Guest</th>
-              <th className="px-4 py-3">Room</th>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3">Check in</th>
-              <th className="px-4 py-3">Check out</th>
-              <th className="px-4 py-3">Promo</th>
-              <th className="px-4 py-3">Notes</th>
-              <th className="px-4 py-3">Status</th>
+              <SortHeader label="Guest" sortKey="guest" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Room" sortKey="room" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Source" sortKey="source" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Check in" sortKey="checkIn" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Check out" sortKey="checkOut" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Promo" sortKey="promo" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Notes" sortKey="notes" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {bookings.map((booking) => (
+            {sortedBookings.map((booking) => (
               <tr key={booking._id}>
                 <td className="px-4 py-3">{booking.guestName || "-"}</td>
                 <td className="px-4 py-3">{formatBookingRooms(booking)}</td>

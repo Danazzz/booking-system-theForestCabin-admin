@@ -1,11 +1,18 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
 import StatCard from "../components/StatCard";
+import { useSortableData } from "../hooks/useSortableData";
 
 const initialFilters = {
   roomId: "",
   checkIn: "",
   checkOut: ""
+};
+
+const dashboardAlertSortAccessors = {
+  createdAt: (alert) => alert.createdAt || "",
+  type: (alert) => alert.type || "",
+  message: (alert) => alert.message || ""
 };
 
 function Dashboard() {
@@ -16,6 +23,11 @@ function Dashboard() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
+  const {
+    sortedItems: sortedAlerts,
+    sortConfig: alertSortConfig,
+    requestSort: requestAlertSort
+  } = useSortableData(alerts, dashboardAlertSortAccessors, { key: "createdAt", direction: "desc" });
 
   const fetchAlerts = async () => {
     const response = await api.get("/alerts");
@@ -150,12 +162,30 @@ function Dashboard() {
       </div>
 
       <div className="rounded-md border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 px-4 py-3">
+        <div className="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold">Alerts</h2>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <select
+              value={alertSortConfig.key}
+              onChange={(event) => requestAlertSort(event.target.value)}
+              className="min-h-10 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
+            >
+              <option value="createdAt">Created date</option>
+              <option value="type">Type</option>
+              <option value="message">Message</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => requestAlertSort(alertSortConfig.key)}
+              className="min-h-10 rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700"
+            >
+              {alertSortConfig.direction === "asc" ? "Asc" : "Desc"}
+            </button>
+          </div>
         </div>
         <div className="divide-y divide-gray-200">
           {alerts.length ? (
-            alerts.slice(0, 5).map((alert) => (
+            sortedAlerts.slice(0, 5).map((alert) => (
               <div key={alert._id} className="px-4 py-3">
                 <p className="font-medium text-red-700">{alert.type}</p>
                 <p className="text-sm text-gray-700">{alert.message}</p>

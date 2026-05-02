@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import SortHeader from "../components/SortHeader";
+import { useSortableData } from "../hooks/useSortableData";
 
 const CHANNEL_OPTION_LIMIT = 20;
 const OTHER_CHANNEL = "__other__";
@@ -19,6 +21,15 @@ const isValidIcalUrl = (url) => {
   return /^https?:\/\//.test(value) && value.includes(".ics");
 };
 
+const sourceSortAccessors = {
+  source: (source) => source.sourceName || source.channelId?.name || "",
+  room: (source) => source.roomId?.name || source.roomId?.code || "",
+  url: (source) => source.url || source.icalUrl || "",
+  roomCount: (source) => source.roomCount || 0,
+  lastSynced: (source) => source.lastSyncedAt || "",
+  status: (source) => source.isActive
+};
+
 function Sync() {
   const [form, setForm] = useState(initialForm);
   const [editingId, setEditingId] = useState("");
@@ -32,8 +43,18 @@ function Sync() {
   const [loading, setLoading] = useState(false);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [syncingId, setSyncingId] = useState("");
+  const {
+    sortedItems: sortedSources,
+    sortConfig,
+    requestSort
+  } = useSortableData(sources, sourceSortAccessors, { key: "source", direction: "asc" });
 
-  const activeChannels = channels.filter((channel) => channel.isActive !== false);
+  const sortedRooms = [...rooms].sort((left, right) => (
+    `${left.name || ""} ${left.code || ""}`.localeCompare(`${right.name || ""} ${right.code || ""}`)
+  ));
+  const activeChannels = channels
+    .filter((channel) => channel.isActive !== false)
+    .sort((left, right) => (left.name || "").localeCompare(right.name || ""));
   const hasChannelDropdown = activeChannels.length > 0 && activeChannels.length <= CHANNEL_OPTION_LIMIT;
 
   const loadSources = async () => {
@@ -298,7 +319,7 @@ function Sync() {
             className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900"
           >
             <option value="">{optionsLoading ? "Loading rooms..." : "Select room"}</option>
-            {rooms.map((room) => (
+            {sortedRooms.map((room) => (
               <option key={room._id} value={room._id}>
                 {room.name || room.code}
               </option>
@@ -407,17 +428,17 @@ function Sync() {
         <table className="min-w-[980px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3">Source</th>
-              <th className="px-4 py-3">Room</th>
-              <th className="px-4 py-3">URL</th>
-              <th className="px-4 py-3">Room count</th>
-              <th className="px-4 py-3">Last synced</th>
-              <th className="px-4 py-3">Status</th>
+              <SortHeader label="Source" sortKey="source" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Room" sortKey="room" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="URL" sortKey="url" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Room count" sortKey="roomCount" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Last synced" sortKey="lastSynced" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {sources.map((source) => (
+            {sortedSources.map((source) => (
               <tr key={source._id}>
                 <td className="px-4 py-3">{source.sourceName || source.channelId?.name || "-"}</td>
                 <td className="px-4 py-3">{source.roomId?.name || source.roomId?.code || "-"}</td>

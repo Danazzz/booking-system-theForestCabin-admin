@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../api/axios";
+import SortHeader from "../components/SortHeader";
+import { useSortableData } from "../hooks/useSortableData";
 
 const emptyForm = {
   name: "",
@@ -9,6 +11,14 @@ const emptyForm = {
   isActive: true
 };
 
+const roomSortAccessors = {
+  name: (room) => room.name,
+  code: (room) => room.code,
+  guests: (room) => room.maxGuestsPerUnit || 0,
+  basePrice: (room) => room.basePrice || 0,
+  status: (room) => room.isActive
+};
+
 function Rooms() {
   const [rooms, setRooms] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -16,6 +26,11 @@ function Rooms() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const {
+    sortedItems: sortedRooms,
+    sortConfig,
+    requestSort
+  } = useSortableData(rooms, roomSortAccessors, { key: "code", direction: "asc" });
 
   const loadRooms = async (params = {}) => {
     const response = await api.get("/rooms", { params });
@@ -160,16 +175,16 @@ function Rooms() {
         <table className="min-w-[760px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <th className="px-4 py-3">Room type</th>
-              <th className="px-4 py-3">Room number</th>
-              <th className="px-4 py-3">Guests</th>
-              <th className="px-4 py-3">Base price</th>
-              <th className="px-4 py-3">Status</th>
+              <SortHeader label="Room type" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Room number" sortKey="code" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Guests" sortKey="guests" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Base price" sortKey="basePrice" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {rooms.map((room) => (
+            {sortedRooms.map((room) => (
               <tr key={room._id}>
                 <td className="px-4 py-3">{room.name}</td>
                 <td className="px-4 py-3">{room.code}</td>
