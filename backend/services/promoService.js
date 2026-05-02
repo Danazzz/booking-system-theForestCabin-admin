@@ -5,12 +5,16 @@ import { ConflictError, NotFoundError, ValidationError } from "./bookingErrors.j
 const promoFields = [
   "name",
   "description",
+  "adjustmentType",
+  "adjustmentValue",
   "isActive"
 ];
 
 const updateFields = [
   "name",
   "description",
+  "adjustmentType",
+  "adjustmentValue",
   "isActive"
 ];
 
@@ -45,6 +49,10 @@ export const createPromo = async (payload) => {
 
   if (!data.name) {
     throw new ValidationError("name is required");
+  }
+
+  if (data.adjustmentValue !== undefined) {
+    data.adjustmentValue = Number(data.adjustmentValue);
   }
 
   try {
@@ -102,6 +110,10 @@ export const updatePromo = async (promoId, payload) => {
 
   if (Object.keys(updates).length === 0) {
     throw new ValidationError("At least one promo field is required");
+  }
+
+  if (updates.adjustmentValue !== undefined) {
+    updates.adjustmentValue = Number(updates.adjustmentValue);
   }
 
   try {

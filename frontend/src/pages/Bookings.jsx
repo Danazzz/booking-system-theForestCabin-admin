@@ -67,6 +67,50 @@ const bookingSortAccessors = {
   status: (booking) => booking.status || ""
 };
 
+const calculatePromoPrice = (basePrice, promo) => {
+  if (!promo || promo.adjustmentType === "none") {
+    return basePrice;
+  }
+
+  const value = Number(promo.adjustmentValue || 0);
+
+  if (promo.adjustmentType === "percentage_discount") {
+    return Math.max(0, basePrice - (basePrice * value / 100));
+  }
+
+  if (promo.adjustmentType === "fixed_discount") {
+    return Math.max(0, basePrice - value);
+  }
+
+  if (promo.adjustmentType === "surcharge") {
+    return basePrice + value;
+  }
+
+  return basePrice;
+};
+
+const formatPromoRule = (promo) => {
+  if (!promo || promo.adjustmentType === "none") {
+    return "No promo price adjustment";
+  }
+
+  const value = Number(promo.adjustmentValue || 0).toLocaleString();
+
+  if (promo.adjustmentType === "percentage_discount") {
+    return `${value}% discount applied`;
+  }
+
+  if (promo.adjustmentType === "fixed_discount") {
+    return `${value} discount applied`;
+  }
+
+  if (promo.adjustmentType === "surcharge") {
+    return `${value} surcharge applied`;
+  }
+
+  return "Promo price adjustment applied";
+};
+
 function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [rooms, setRooms] = useState([]);
@@ -125,15 +169,28 @@ function Bookings() {
     setEditingId("");
   };
 
+  const getPriceForSelection = (roomIds, promoId) => {
+    const nextSelectedRooms = rooms.filter((room) => roomIds.includes(room._id));
+    const basePrice = nextSelectedRooms.reduce((sum, room) => sum + Number(room.basePrice || 0), 0);
+    const promo = promos.find((item) => item._id === promoId);
+
+    return calculatePromoPrice(basePrice, promo);
+  };
+
   const handleChange = (event) => {
+    const { name, value } = event.target;
+
     setForm((current) => ({
       ...current,
-      [event.target.name]: event.target.value
+      [name]: value,
+      ...(name === "promoId" ? { price: String(getPriceForSelection(current.roomIds, value)) } : {})
     }));
   };
 
   const selectedRooms = rooms.filter((room) => form.roomIds.includes(room._id));
   const calculatedPrice = selectedRooms.reduce((sum, room) => sum + Number(room.basePrice || 0), 0);
+  const selectedPromo = promos.find((promo) => promo._id === form.promoId);
+  const finalPrice = calculatePromoPrice(calculatedPrice, selectedPromo);
 
   const handleRoomToggle = (roomId) => {
     setForm((current) => {
@@ -141,8 +198,7 @@ function Bookings() {
       const roomIds = exists
         ? current.roomIds.filter((id) => id !== roomId)
         : [...current.roomIds, roomId];
-      const nextSelectedRooms = rooms.filter((room) => roomIds.includes(room._id));
-      const nextPrice = nextSelectedRooms.reduce((sum, room) => sum + Number(room.basePrice || 0), 0);
+      const nextPrice = getPriceForSelection(roomIds, current.promoId);
 
       return {
         ...current,
@@ -264,8 +320,10 @@ function Bookings() {
         <input name="externalId" value={form.externalId} onChange={handleChange} placeholder="OTA booking code (optional)" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="checkIn" type="date" value={form.checkIn} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="checkOut" type="date" value={form.checkOut} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="price" type="number" min="0" value={form.price} onChange={handleChange} placeholder="Price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <p className="self-center text-sm text-gray-500">Base total: {calculatedPrice.toLocaleString()}</p>
+        <input name="price" type="number" min="0" value={form.price} readOnly placeholder="Price" className="min-h-11 rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none" />
+        <p className="self-center text-sm text-gray-500">
+          Base: {calculatedPrice.toLocaleString()} · Final: {finalPrice.toLocaleString()}
+        </p>
         <select name="promoId" value={form.promoId} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
           <option value="">No promo</option>
           {promos.map((promo) => (
@@ -274,6 +332,7 @@ function Bookings() {
             </option>
           ))}
         </select>
+        <p className="self-center text-sm text-gray-500">{formatPromoRule(selectedPromo)}</p>
         <textarea name="notes" value={form.notes} onChange={handleChange} maxLength="500" placeholder="Notes" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-4" />
         <div className="flex flex-col gap-2 sm:flex-row md:col-span-4">
           <button type="submit" disabled={loading} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">

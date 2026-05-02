@@ -6,13 +6,23 @@ import { useSortableData } from "../hooks/useSortableData";
 const emptyForm = {
   name: "",
   description: "",
+  adjustmentType: "none",
+  adjustmentValue: "",
   isActive: true
 };
 
 const promoSortAccessors = {
   name: (promo) => promo.name,
   description: (promo) => promo.description || "",
+  adjustment: (promo) => promo.adjustmentValue || 0,
   status: (promo) => promo.isActive
+};
+
+const adjustmentLabels = {
+  none: "No price change",
+  percentage_discount: "Percentage discount",
+  fixed_discount: "Fixed discount",
+  surcharge: "Surcharge"
 };
 
 function Promos() {
@@ -78,11 +88,16 @@ function Promos() {
     setLoading(true);
 
     try {
+      const payload = {
+        ...form,
+        adjustmentValue: form.adjustmentValue ? Number(form.adjustmentValue) : 0
+      };
+
       if (editingId) {
-        await api.patch(`/promos/${editingId}`, form);
+        await api.patch(`/promos/${editingId}`, payload);
         setMessage("Promo updated");
       } else {
-        await api.post("/promos", form);
+        await api.post("/promos", payload);
         setMessage("Promo created");
       }
 
@@ -100,6 +115,8 @@ function Promos() {
     setForm({
       name: promo.name || "",
       description: promo.description || "",
+      adjustmentType: promo.adjustmentType || "none",
+      adjustmentValue: promo.adjustmentValue || "",
       isActive: Boolean(promo.isActive)
     });
   };
@@ -133,14 +150,21 @@ function Promos() {
         <p className="mt-1 text-sm text-gray-500">Manage selectable booking promos.</p>
       </div>
 
-      <form className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-3" onSubmit={handleSubmit}>
+      <form className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-4" onSubmit={handleSubmit}>
         <input name="name" value={form.name} onChange={handleChange} required placeholder="Promo name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="description" value={form.description} onChange={handleChange} placeholder="Description" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2" />
+        <select name="adjustmentType" value={form.adjustmentType} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+          <option value="none">No price change</option>
+          <option value="percentage_discount">Percentage discount</option>
+          <option value="fixed_discount">Fixed discount</option>
+          <option value="surcharge">Surcharge</option>
+        </select>
+        <input name="adjustmentValue" type="number" min="0" value={form.adjustmentValue} onChange={handleChange} placeholder="Promo value" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input name="isActive" type="checkbox" checked={form.isActive} onChange={handleChange} />
           Active
         </label>
-        <div className="flex flex-col gap-2 sm:flex-row md:col-span-3">
+        <div className="flex flex-col gap-2 sm:flex-row md:col-span-4">
           <button type="submit" disabled={loading} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
             {editingId ? "Update promo" : "Create promo"}
           </button>
@@ -156,11 +180,12 @@ function Promos() {
       {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-md border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-[760px] divide-y divide-gray-200 text-sm">
+        <table className="min-w-[900px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
               <SortHeader label="Name" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Description" sortKey="description" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Price rule" sortKey="adjustment" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -170,6 +195,10 @@ function Promos() {
               <tr key={promo._id}>
                 <td className="px-4 py-3 font-medium">{promo.name}</td>
                 <td className="px-4 py-3">{promo.description || "-"}</td>
+                <td className="px-4 py-3">
+                  {adjustmentLabels[promo.adjustmentType || "none"]}
+                  {promo.adjustmentType && promo.adjustmentType !== "none" ? ` (${Number(promo.adjustmentValue || 0).toLocaleString()}${promo.adjustmentType === "percentage_discount" ? "%" : ""})` : ""}
+                </td>
                 <td className="px-4 py-3">{promo.isActive ? "Active" : "Inactive"}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
@@ -183,7 +212,7 @@ function Promos() {
             ))}
             {!promos.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="4">No promos found.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="5">No promos found.</td>
               </tr>
             ) : null}
           </tbody>

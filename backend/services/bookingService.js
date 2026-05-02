@@ -79,7 +79,7 @@ const validateNotes = (notes) => {
   }
 };
 
-const resolvePromoId = async (promoId) => {
+const resolvePromo = async (promoId) => {
   if (promoId === undefined) {
     return undefined;
   }
@@ -90,7 +90,7 @@ const resolvePromoId = async (promoId) => {
 
   const promo = await ensureActivePromo(promoId);
 
-  return promo._id;
+  return promo;
 };
 
 const populateBooking = (booking) => {
@@ -98,7 +98,7 @@ const populateBooking = (booking) => {
     .populate("roomId", "name code totalUnits basePrice")
     .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
-    .populate("promoId", "name description isActive");
+    .populate("promoId", "name description adjustmentType adjustmentValue isActive");
 };
 
 const normalizeRoomIds = (payload) => {
@@ -140,6 +140,28 @@ const resolveRooms = async ({ propertyId, roomIds }) => {
 
 const calculateRoomPrice = (rooms) => {
   return rooms.reduce((sum, room) => sum + Number(room.basePrice || 0), 0);
+};
+
+const applyPromoPricing = (basePrice, promo) => {
+  if (!promo || promo.adjustmentType === "none") {
+    return basePrice;
+  }
+
+  const adjustmentValue = Number(promo.adjustmentValue || 0);
+
+  if (promo.adjustmentType === "percentage_discount") {
+    return Math.max(0, basePrice - (basePrice * adjustmentValue / 100));
+  }
+
+  if (promo.adjustmentType === "fixed_discount") {
+    return Math.max(0, basePrice - adjustmentValue);
+  }
+
+  if (promo.adjustmentType === "surcharge") {
+    return basePrice + adjustmentValue;
+  }
+
+  return basePrice;
 };
 
 const resolveChannel = async ({
@@ -271,7 +293,9 @@ export const createBooking = async (payload) => {
     source: payload.source
   });
   const roomCount = roomIds.length;
-  const promoId = await resolvePromoId(payload.promoId);
+  const promo = await resolvePromo(payload.promoId);
+  const basePrice = calculateRoomPrice(rooms);
+  const promoPrice = applyPromoPricing(basePrice, promo);
 
   await ensureBookingAvailability({
     propertyId: payload.propertyId,
@@ -296,8 +320,8 @@ export const createBooking = async (payload) => {
       roomCount,
       checkIn,
       checkOut,
-      price: payload.price ?? calculateRoomPrice(rooms),
-      promoId,
+      price: promo ? promoPrice : payload.price ?? basePrice,
+      promoId: promo?._id || null,
       promo: payload.promo,
       promoCode: payload.promoCode,
       notes: payload.notes,
@@ -331,7 +355,11 @@ export const updateExistingBooking = async (booking, payload) => {
     roomIds
   });
   const roomCount = roomIds.length;
-  const promoId = await resolvePromoId(payload.promoId);
+  const promo = payload.promoId === undefined && booking.promoId
+    ? await ensureActivePromo(booking.promoId)
+    : await resolvePromo(payload.promoId);
+  const basePrice = calculateRoomPrice(rooms);
+  const promoPrice = applyPromoPricing(basePrice, promo);
   const hasChannelInput = payload.channelId || payload.sourceName || payload.source;
   const channel = await resolveChannel({
     propertyId: booking.propertyId,
@@ -361,9 +389,9 @@ export const updateExistingBooking = async (booking, payload) => {
   booking.roomCount = roomCount;
   booking.checkIn = checkIn;
   booking.checkOut = checkOut;
-  booking.price = payload.price ?? calculateRoomPrice(rooms);
-  if (promoId !== undefined) {
-    booking.promoId = promoId;
+  booking.price = promo ? promoPrice : payload.price ?? basePrice;
+  if (promo !== undefined) {
+    booking.promoId = promo?._id || null;
   }
   booking.promo = payload.promo ?? booking.promo;
   booking.promoCode = payload.promoCode ?? booking.promoCode;
@@ -410,7 +438,7 @@ export const listBookings = async (filters = {}) => {
     .populate("roomId", "name code totalUnits basePrice")
     .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
-    .populate("promoId", "name description isActive")
+    .populate("promoId", "name description adjustmentType adjustmentValue isActive")
     .sort({ checkIn: 1, createdAt: 1 });
 };
 
@@ -421,7 +449,7 @@ export const getBookingById = async (bookingId) => {
     .populate("roomId", "name code totalUnits basePrice")
     .populate("roomIds", "name code totalUnits basePrice")
     .populate("channelId", "name type isActive")
-    .populate("promoId", "name description isActive");
+    .populate("promoId", "name description adjustmentType adjustmentValue isActive");
 
   if (!booking) {
     throw new NotFoundError("Booking not found");

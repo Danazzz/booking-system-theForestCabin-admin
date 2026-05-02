@@ -12,6 +12,16 @@ const promoSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
+    adjustmentType: {
+      type: String,
+      enum: ["none", "percentage_discount", "fixed_discount", "surcharge"],
+      default: "none"
+    },
+    adjustmentValue: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
     isActive: {
       type: Boolean,
       default: true
