@@ -5,18 +5,20 @@ import { useSortableData } from "../hooks/useSortableData";
 
 const emptyForm = {
   name: "",
-  code: "",
-  maxGuestsPerUnit: "",
+  roomNumber: "",
+  roomType: "deluxe",
+  capacity: "",
   basePrice: "",
-  isActive: true
+  status: "active"
 };
 
 const roomSortAccessors = {
   name: (room) => room.name,
-  code: (room) => room.code,
-  guests: (room) => room.maxGuestsPerUnit || 0,
+  roomNumber: (room) => room.roomNumber,
+  roomType: (room) => room.roomType,
+  capacity: (room) => room.capacity || 0,
   basePrice: (room) => room.basePrice || 0,
-  status: (room) => room.isActive
+  status: (room) => room.status
 };
 
 function Rooms() {
@@ -27,13 +29,13 @@ function Rooms() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const {
-    sortedItems: sortedRooms,
+    sortedItems,
     sortConfig,
     requestSort
-  } = useSortableData(rooms, roomSortAccessors, { key: "code", direction: "asc" });
+  } = useSortableData(rooms, roomSortAccessors, { key: "roomNumber", direction: "asc" });
 
-  const loadRooms = async (params = {}) => {
-    const response = await api.get("/rooms", { params });
+  const loadRooms = async () => {
+    const response = await api.get("/rooms");
     setRooms(response.data.data || []);
   };
 
@@ -49,7 +51,7 @@ function Rooms() {
         }
       } catch (err) {
         if (!ignore) {
-          setError(err.response?.data?.error || "Failed to load rooms");
+          setError(err.response?.data?.message || "Failed to load rooms");
         }
       }
     };
@@ -67,11 +69,9 @@ function Rooms() {
   };
 
   const handleChange = (event) => {
-    const { name, value, type, checked } = event.target;
-
     setForm((current) => ({
       ...current,
-      [name]: type === "checkbox" ? checked : value
+      [event.target.name]: event.target.value
     }));
   };
 
@@ -83,20 +83,13 @@ function Rooms() {
 
     const payload = {
       ...form,
-      totalUnits: 1,
-      maxGuestsPerUnit: form.maxGuestsPerUnit ? Number(form.maxGuestsPerUnit) : undefined,
-      basePrice: form.basePrice ? Number(form.basePrice) : 0
+      capacity: Number(form.capacity),
+      basePrice: Number(form.basePrice || 0)
     };
-
-    if (!payload.maxGuestsPerUnit) {
-      delete payload.maxGuestsPerUnit;
-    }
 
     try {
       if (editingId) {
-        const updates = { ...payload };
-        delete updates.totalUnits;
-        await api.patch(`/rooms/${editingId}`, updates);
+        await api.patch(`/rooms/${editingId}`, payload);
         setMessage("Room updated");
       } else {
         await api.post("/rooms", payload);
@@ -106,7 +99,7 @@ function Rooms() {
       resetForm();
       await loadRooms();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to save room");
+      setError(err.response?.data?.message || "Failed to save room");
     } finally {
       setLoading(false);
     }
@@ -116,15 +109,16 @@ function Rooms() {
     setEditingId(room._id);
     setForm({
       name: room.name || "",
-      code: room.code || "",
-      maxGuestsPerUnit: room.maxGuestsPerUnit || "",
+      roomNumber: room.roomNumber || "",
+      roomType: room.roomType || "deluxe",
+      capacity: room.capacity || "",
       basePrice: room.basePrice || "",
-      isActive: Boolean(room.isActive)
+      status: room.status || "active"
     });
   };
 
   const deleteRoom = async (roomId) => {
-    if (!window.confirm("Delete this room? Rooms with active bookings cannot be deleted.")) {
+    if (!window.confirm("Mark this room inactive?")) {
       return;
     }
 
@@ -133,10 +127,10 @@ function Rooms() {
 
     try {
       await api.delete(`/rooms/${roomId}`);
-      setMessage("Room deleted");
+      setMessage("Room marked inactive");
       await loadRooms();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to delete room");
+      setError(err.response?.data?.message || "Failed to update room");
     }
   };
 
@@ -144,18 +138,24 @@ function Rooms() {
     <section className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold">Rooms</h1>
-        <p className="mt-1 text-sm text-gray-500">Create physical rooms and assign room numbers.</p>
+        <p className="mt-1 text-sm text-gray-500">The Forest Cabin inventory used by the booking and calendar APIs.</p>
       </div>
 
       <form className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-3" onSubmit={handleSubmit}>
-        <input name="name" value={form.name} onChange={handleChange} required placeholder="Room type, e.g. Superior" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="code" value={form.code} onChange={handleChange} required placeholder="Room number, e.g. 101" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="maxGuestsPerUnit" type="number" min="1" value={form.maxGuestsPerUnit} onChange={handleChange} placeholder="Max guests per unit" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="name" value={form.name} onChange={handleChange} required placeholder="Room name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="roomNumber" value={form.roomNumber} onChange={handleChange} required placeholder="Room number, e.g. 101" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <select name="roomType" value={form.roomType} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+          <option value="deluxe">Deluxe</option>
+          <option value="suite">Suite</option>
+          <option value="superior">Superior</option>
+        </select>
+        <input name="capacity" type="number" min="1" value={form.capacity} onChange={handleChange} required placeholder="Capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="basePrice" type="number" min="0" value={form.basePrice} onChange={handleChange} placeholder="Base price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input name="isActive" type="checkbox" checked={form.isActive} onChange={handleChange} />
-          Active
-        </label>
+        <select name="status" value={form.status} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+          <option value="active">Active</option>
+          <option value="maintenance">Maintenance</option>
+          <option value="inactive">Inactive</option>
+        </select>
         <div className="flex flex-col gap-2 sm:flex-row md:col-span-3">
           <button type="submit" disabled={loading} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
             {editingId ? "Update room" : "Create room"}
@@ -172,36 +172,38 @@ function Rooms() {
       {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-md border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-[760px] divide-y divide-gray-200 text-sm">
+        <table className="min-w-[840px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
-              <SortHeader label="Room type" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
-              <SortHeader label="Room number" sortKey="code" sortConfig={sortConfig} onSort={requestSort} />
-              <SortHeader label="Guests" sortKey="guests" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Room number" sortKey="roomNumber" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Room type" sortKey="roomType" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Name" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Capacity" sortKey="capacity" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Base price" sortKey="basePrice" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {sortedRooms.map((room) => (
+            {sortedItems.map((room) => (
               <tr key={room._id}>
+                <td className="px-4 py-3 font-medium text-gray-900">{room.roomNumber}</td>
+                <td className="px-4 py-3 capitalize">{room.roomType}</td>
                 <td className="px-4 py-3">{room.name}</td>
-                <td className="px-4 py-3">{room.code}</td>
-                <td className="px-4 py-3">{room.maxGuestsPerUnit || "-"}</td>
-                <td className="px-4 py-3">{room.basePrice ? Number(room.basePrice).toLocaleString() : "-"}</td>
-                <td className="px-4 py-3">{room.isActive ? "Active" : "Inactive"}</td>
+                <td className="px-4 py-3">{room.capacity}</td>
+                <td className="px-4 py-3">{Number(room.basePrice || 0).toLocaleString()}</td>
+                <td className="px-4 py-3 capitalize">{room.status}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
                     <button type="button" onClick={() => editRoom(room)} className="min-h-10 rounded-md border border-gray-300 px-3 py-1 text-sm">Edit</button>
-                    <button type="button" onClick={() => deleteRoom(room._id)} className="min-h-10 rounded-md border border-red-300 px-3 py-1 text-sm text-red-700">Delete</button>
+                    <button type="button" onClick={() => deleteRoom(room._id)} className="min-h-10 rounded-md border border-red-300 px-3 py-1 text-sm text-red-700">Inactive</button>
                   </div>
                 </td>
               </tr>
             ))}
             {!rooms.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="6">No rooms found.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="7">No rooms found. Run the backend room seed script first.</td>
               </tr>
             ) : null}
           </tbody>

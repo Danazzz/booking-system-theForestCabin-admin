@@ -1,15 +1,13 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import AdminLayout from "./layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
-import Alerts from "./pages/Alerts";
+import BookingDetail from "./pages/BookingDetail";
 import Bookings from "./pages/Bookings";
-import Channels from "./pages/Channels";
-import Configs from "./pages/Configs";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-import Promos from "./pages/Promos";
+import ReservationCalendar from "./pages/ReservationCalendar";
 import Rooms from "./pages/Rooms";
-import Sync from "./pages/Sync";
+import WaitingApproval from "./pages/WaitingApproval";
 
 function App() {
   return (
@@ -24,12 +22,10 @@ function App() {
       >
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/bookings" element={<Bookings />} />
+        <Route path="/bookings/:id" element={<BookingDetail />} />
+        <Route path="/waiting-approval" element={<WaitingApproval />} />
+        <Route path="/calendar" element={<ReservationCalendar />} />
         <Route path="/rooms" element={<Rooms />} />
-        <Route path="/promos" element={<Promos />} />
-        <Route path="/channels" element={<Channels />} />
-        <Route path="/configs" element={<Configs />} />
-        <Route path="/alerts" element={<Alerts />} />
-        <Route path="/sync" element={<Sync />} />
       </Route>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

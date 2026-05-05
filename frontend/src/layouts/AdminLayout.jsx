@@ -1,50 +1,19 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
   { to: "/bookings", label: "Bookings" },
-  { to: "/rooms", label: "Rooms" },
-  { to: "/promos", label: "Promos" },
-  { to: "/channels", label: "Channels" },
-  { to: "/configs", label: "Configs" },
-  { to: "/alerts", label: "Alerts" },
-  { to: "/sync", label: "Sync" }
+  { to: "/waiting-approval", label: "Waiting Approval" },
+  { to: "/calendar", label: "Calendar" },
+  { to: "/rooms", label: "Rooms" }
 ];
 
 function AdminLayout() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [unreadAlerts, setUnreadAlerts] = useState(0);
-
-  useEffect(() => {
-    let ignore = false;
-
-    const loadUnreadAlerts = async () => {
-      try {
-        const response = await api.get("/alerts");
-
-        if (!ignore) {
-          setUnreadAlerts((response.data.data || []).length);
-        }
-      } catch {
-        if (!ignore) {
-          setUnreadAlerts(0);
-        }
-      }
-    };
-
-    loadUnreadAlerts();
-    const interval = window.setInterval(loadUnreadAlerts, 60000);
-
-    return () => {
-      ignore = true;
-      window.clearInterval(interval);
-    };
-  }, []);
 
   const handleLogout = () => {
     logout();
@@ -73,11 +42,6 @@ function AdminLayout() {
             }
           >
             <span>{item.label}</span>
-            {item.to === "/alerts" && unreadAlerts > 0 ? (
-              <span className="min-w-6 rounded-full bg-red-600 px-2 py-0.5 text-center text-xs font-semibold text-white">
-                {unreadAlerts}
-              </span>
-            ) : null}
           </NavLink>
         ))}
       </nav>
