@@ -151,6 +151,7 @@ function BookingDetail() {
                 <div><dt className="text-gray-500">Adults</dt><dd className="font-medium">{booking.numberOfGuests}</dd></div>
                 <div><dt className="text-gray-500">Children</dt><dd className="font-medium">{booking.numberOfChildren || 0}</dd></div>
                 <div><dt className="text-gray-500">Total</dt><dd className="font-medium">{currencyFormatter.format(booking.totalAmount || 0)}</dd></div>
+                {booking.promoName ? <div><dt className="text-gray-500">Promo</dt><dd className="font-medium">{booking.promoName}</dd></div> : null}
                 <div><dt className="text-gray-500">Booking status</dt><dd className="font-medium">{booking.bookingStatus}</dd></div>
                 <div><dt className="text-gray-500">Payment status</dt><dd className="font-medium">{booking.paymentStatus}</dd></div>
                 {booking.rejectionReason ? <div><dt className="text-gray-500">Rejection</dt><dd className="font-medium">{booking.rejectionReason}</dd></div> : null}
