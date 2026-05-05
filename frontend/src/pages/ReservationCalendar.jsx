@@ -21,6 +21,12 @@ const endOfMonth = () => {
   return new Date(now.getFullYear(), now.getMonth() + 1, 0);
 };
 
+const getInitialCalendarFilters = () => ({
+  startDate: toDateInput(startOfMonth()),
+  endDate: toDateInput(endOfMonth()),
+  roomType: "all"
+});
+
 const dateDiff = (start, end) => {
   const startDate = new Date(`${start}T00:00:00Z`);
   const endDate = new Date(`${end}T00:00:00Z`);
@@ -43,15 +49,11 @@ const clampBooking = (booking, dates) => {
 };
 
 function ReservationCalendar() {
-  const [filters, setFilters] = useState({
-    startDate: toDateInput(startOfMonth()),
-    endDate: toDateInput(endOfMonth()),
-    roomType: "all"
-  });
+  const [filters, setFilters] = useState(getInitialCalendarFilters);
   const [grid, setGrid] = useState({ dates: [], roomGroups: [] });
   const [roomTypes, setRoomTypes] = useState([]);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const dayWidth = 108;
   const gridTemplateColumns = useMemo(
@@ -81,7 +83,34 @@ function ReservationCalendar() {
   };
 
   useEffect(() => {
-    loadCalendar();
+    let ignore = false;
+
+    const loadInitialCalendar = async () => {
+      try {
+        const response = await api.get("/admin/calendar/grid", {
+          params: getInitialCalendarFilters()
+        });
+
+        if (!ignore) {
+          setGrid(response.data.data || { dates: [], roomGroups: [] });
+          setError("");
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.response?.data?.message || "Failed to load reservation calendar");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadInitialCalendar();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   useEffect(() => {

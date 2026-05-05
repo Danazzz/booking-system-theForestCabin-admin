@@ -8,7 +8,7 @@ function WaitingApproval() {
   const [bookings, setBookings] = useState([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadBookings = async () => {
     setLoading(true);
@@ -25,7 +25,32 @@ function WaitingApproval() {
   };
 
   useEffect(() => {
-    loadBookings();
+    let ignore = false;
+
+    const loadInitialBookings = async () => {
+      try {
+        const response = await api.get("/admin/bookings/waiting-approval");
+
+        if (!ignore) {
+          setBookings(response.data.data || []);
+          setError("");
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.response?.data?.message || "Failed to load waiting approval bookings");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadInitialBookings();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const reviewPayment = async (paymentId, action, rejectionReason = "invalid_payment_proof") => {

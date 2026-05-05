@@ -52,7 +52,31 @@ function BookingDetail() {
   };
 
   useEffect(() => {
-    loadBooking();
+    let ignore = false;
+
+    const loadInitialBooking = async () => {
+      try {
+        const response = await api.get(`/admin/bookings/${id}`);
+
+        if (!ignore) {
+          const nextBooking = response.data.data.booking;
+          setBooking(nextBooking);
+          setPayments(response.data.data.payments || []);
+          setInvoice(nextBooking?.invoiceId?._id ? nextBooking.invoiceId : null);
+          setError("");
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.response?.data?.message || "Failed to load booking detail");
+        }
+      }
+    };
+
+    loadInitialBooking();
+
+    return () => {
+      ignore = true;
+    };
   }, [id]);
 
   const handleChange = (event) => {

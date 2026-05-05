@@ -35,7 +35,7 @@ function Bookings() {
   const [roomTypes, setRoomTypes] = useState([]);
   const [filters, setFilters] = useState({ bookingStatus: "", roomType: "all" });
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const {
     sortedItems,
     sortConfig,
@@ -71,7 +71,32 @@ function Bookings() {
   };
 
   useEffect(() => {
-    loadBookings();
+    let ignore = false;
+
+    const loadFilteredBookings = async () => {
+      try {
+        const response = await api.get("/admin/bookings", { params });
+
+        if (!ignore) {
+          setBookings(response.data.data || []);
+          setError("");
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(err.response?.data?.message || "Failed to load bookings");
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadFilteredBookings();
+
+    return () => {
+      ignore = true;
+    };
   }, [params]);
 
   useEffect(() => {
@@ -99,6 +124,7 @@ function Bookings() {
   }, []);
 
   const handleFilterChange = (event) => {
+    setLoading(true);
     setFilters((current) => ({
       ...current,
       [event.target.name]: event.target.value
