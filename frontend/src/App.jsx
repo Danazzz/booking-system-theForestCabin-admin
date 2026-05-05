@@ -3,9 +3,11 @@ import AdminLayout from "./layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BookingDetail from "./pages/BookingDetail";
 import Bookings from "./pages/Bookings";
+import CreateManualBooking from "./pages/CreateManualBooking";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Gallery from "./pages/Gallery";
+import InvoiceSettings from "./pages/InvoiceSettings";
 import Payments from "./pages/Payments";
 import Promos from "./pages/Promos";
 import ReservationCalendar from "./pages/ReservationCalendar";
@@ -26,11 +28,13 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="bookings" element={<Bookings />} />
+        <Route path="bookings/new" element={<CreateManualBooking />} />
         <Route path="bookings/:id" element={<BookingDetail />} />
         <Route path="waiting-approval" element={<WaitingApproval />} />
         <Route path="calendar" element={<ReservationCalendar />} />
         <Route path="rooms" element={<Rooms />} />
         <Route path="payments" element={<Payments />} />
+        <Route path="invoice-settings" element={<InvoiceSettings />} />
         <Route path="promos" element={<Promos />} />
         <Route path="gallery" element={<Gallery />} />
       </Route>

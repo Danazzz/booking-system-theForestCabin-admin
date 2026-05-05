@@ -1,0 +1,306 @@
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import api from "../api/axios";
+
+const emptyForm = {
+  guestName: "",
+  guestEmail: "",
+  guestPhone: "",
+  roomType: "",
+  roomId: "",
+  checkIn: "",
+  checkOut: "",
+  numberOfGuests: 2,
+  numberOfChildren: 0,
+  promoId: "",
+  bookingStatus: "pending_payment",
+  paymentStatus: "unpaid",
+  overrideTotal: false,
+  totalAmount: "",
+  adminNote: ""
+};
+
+const currencyFormatter = new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  maximumFractionDigits: 0
+});
+
+const getErrorMessage = (error, fallback) =>
+  error.response?.data?.message || error.response?.data?.error || fallback;
+
+const formatRoomType = (roomType) =>
+  String(roomType || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+const getNights = (checkIn, checkOut) => {
+  if (!checkIn || !checkOut) {
+    return 0;
+  }
+
+  const startDate = new Date(checkIn);
+  const endDate = new Date(checkOut);
+  const diff = endDate.getTime() - startDate.getTime();
+
+  if (diff <= 0) {
+    return 0;
+  }
+
+  return Math.ceil(diff / (1000 * 60 * 60 * 24));
+};
+
+const applyPromoPricing = (subtotal, promo) => {
+  if (!promo || subtotal <= 0) {
+    return subtotal;
+  }
+
+  const value = Number(promo.adjustmentValue || 0);
+
+  if (promo.adjustmentType === "percentage_discount") {
+    return subtotal - subtotal * Math.min(value, 100) / 100;
+  }
+
+  if (promo.adjustmentType === "fixed_discount") {
+    return subtotal - value;
+  }
+
+  if (promo.adjustmentType === "bundle_price") {
+    return value;
+  }
+
+  if (promo.adjustmentType === "surcharge") {
+    return subtotal + value;
+  }
+
+  return subtotal;
+};
+
+function CreateManualBooking() {
+  const navigate = useNavigate();
+  const [form, setForm] = useState(emptyForm);
+  const [rooms, setRooms] = useState([]);
+  const [promos, setPromos] = useState([]);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const roomTypes = useMemo(() => {
+    const map = new Map();
+
+    rooms.forEach((room) => {
+      if (!map.has(room.roomType)) {
+        map.set(room.roomType, formatRoomType(room.roomType));
+      }
+    });
+
+    return Array.from(map.entries()).map(([roomType, label]) => ({ roomType, label }));
+  }, [rooms]);
+
+  const filteredRooms = useMemo(
+    () => rooms.filter((room) => !form.roomType || room.roomType === form.roomType),
+    [form.roomType, rooms]
+  );
+
+  const selectedRoom =
+    rooms.find((room) => room._id === form.roomId) || filteredRooms[0] || null;
+  const selectedPromo = promos.find((promo) => promo._id === form.promoId) || null;
+  const nights = getNights(form.checkIn, form.checkOut);
+  const calculatedSubtotal = nights * Number(selectedRoom?.basePrice || 0);
+  const calculatedTotal = Math.max(
+    0,
+    Math.round(applyPromoPricing(calculatedSubtotal, selectedPromo))
+  );
+  const finalTotal = form.overrideTotal
+    ? Number(form.totalAmount || 0)
+    : calculatedTotal;
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadData = async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const [roomsResponse, promosResponse] = await Promise.all([
+          api.get("/rooms", { params: { status: "active" } }),
+          api.get("/promos/active")
+        ]);
+
+        if (!ignore) {
+          const nextRooms = roomsResponse.data.data || [];
+          setRooms(nextRooms);
+          setPromos(promosResponse.data.data || []);
+          setForm((current) => ({
+            ...current,
+            roomType: current.roomType || nextRooms[0]?.roomType || "",
+            roomId: current.roomId || nextRooms[0]?._id || ""
+          }));
+        }
+      } catch (err) {
+        if (!ignore) {
+          setError(getErrorMessage(err, "Failed to load manual booking data"));
+        }
+      } finally {
+        if (!ignore) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const handleChange = (event) => {
+    const { name, value, type, checked } = event.target;
+
+    setForm((current) => {
+      const next = {
+        ...current,
+        [name]: type === "checkbox" ? checked : value
+      };
+
+      if (name === "roomType") {
+        const firstRoom = rooms.find((room) => room.roomType === value);
+        next.roomId = firstRoom?._id || "";
+      }
+
+      if (name === "bookingStatus" && value === "success") {
+        next.paymentStatus = "paid";
+      }
+
+      if (name === "bookingStatus" && value === "pending_payment") {
+        next.paymentStatus = "unpaid";
+      }
+
+      return next;
+    });
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError("");
+    setMessage("");
+    setSaving(true);
+
+    try {
+      const payload = {
+        ...form,
+        roomType: selectedRoom?.roomType || form.roomType,
+        roomId: form.roomId || selectedRoom?._id,
+        numberOfGuests: Number(form.numberOfGuests),
+        numberOfChildren: Number(form.numberOfChildren || 0),
+        totalAmount: Number(finalTotal || 0),
+        overrideTotal: Boolean(form.overrideTotal),
+        promoId: form.promoId || undefined
+      };
+
+      const response = await api.post("/admin/bookings/manual", payload);
+      const booking = response.data.data;
+
+      setMessage("Manual booking created");
+      navigate(`/bookings/${booking._id}`);
+    } catch (err) {
+      setError(getErrorMessage(err, "Failed to create manual booking"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Create Manual Booking</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Add bookings received directly by admin, WhatsApp, phone, or walk-in.
+          </p>
+        </div>
+        <Link to="/bookings" className="min-h-11 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800">
+          Back to bookings
+        </Link>
+      </div>
+
+      {error ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p> : null}
+      {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
+
+      <form className="space-y-6" onSubmit={handleSubmit}>
+        <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold">Guest</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <input name="guestName" value={form.guestName} onChange={handleChange} required placeholder="Guest name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+            <input name="guestPhone" value={form.guestPhone} onChange={handleChange} required placeholder="Phone / WhatsApp" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+            <input name="guestEmail" type="email" value={form.guestEmail} onChange={handleChange} placeholder="Email optional" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+          </div>
+        </div>
+
+        <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold">Stay</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-4">
+            <select name="roomType" value={form.roomType} onChange={handleChange} disabled={loading || roomTypes.length === 0} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+              {roomTypes.map((roomType) => (
+                <option key={roomType.roomType} value={roomType.roomType}>{roomType.label}</option>
+              ))}
+            </select>
+            <select name="roomId" value={form.roomId} onChange={handleChange} disabled={loading || filteredRooms.length === 0} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+              {filteredRooms.map((room) => (
+                <option key={room._id} value={room._id}>
+                  {room.roomNumber} · {room.name}
+                </option>
+              ))}
+            </select>
+            <input name="checkIn" type="date" value={form.checkIn} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+            <input name="checkOut" type="date" value={form.checkOut} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+            <input name="numberOfGuests" type="number" min="1" value={form.numberOfGuests} onChange={handleChange} required placeholder="Adults" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+            <input name="numberOfChildren" type="number" min="0" value={form.numberOfChildren} onChange={handleChange} placeholder="Children" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+            <select name="promoId" value={form.promoId} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2">
+              <option value="">No promo</option>
+              {promos.map((promo) => (
+                <option key={promo._id} value={promo._id}>{promo.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+          <h2 className="font-semibold">Status & Pricing</h2>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <select name="bookingStatus" value={form.bookingStatus} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+              <option value="pending_payment">Pending payment</option>
+              <option value="success">Success</option>
+            </select>
+            <div className="flex min-h-11 items-center rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+              Payment: {form.bookingStatus === "success" ? "Paid" : "Unpaid"}
+            </div>
+            <label className="flex min-h-11 items-center gap-2 rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-700">
+              <input name="overrideTotal" type="checkbox" checked={form.overrideTotal} onChange={handleChange} />
+              Override total
+            </label>
+            <input name="totalAmount" type="number" min="0" value={form.overrideTotal ? form.totalAmount : String(calculatedTotal || "")} onChange={handleChange} disabled={!form.overrideTotal} placeholder="Total amount" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 disabled:bg-gray-100 md:col-span-3" />
+          </div>
+          <div className="mt-4 grid gap-3 rounded-md bg-gray-50 p-4 text-sm md:grid-cols-4">
+            <p><span className="text-gray-500">Nights:</span> <span className="font-medium">{nights}</span></p>
+            <p><span className="text-gray-500">Base price:</span> <span className="font-medium">{currencyFormatter.format(selectedRoom?.basePrice || 0)}</span></p>
+            <p><span className="text-gray-500">Calculated:</span> <span className="font-medium">{currencyFormatter.format(calculatedTotal)}</span></p>
+            <p><span className="text-gray-500">Final:</span> <span className="font-medium">{currencyFormatter.format(finalTotal || 0)}</span></p>
+          </div>
+          <textarea name="adminNote" value={form.adminNote} onChange={handleChange} placeholder="Admin note" className="mt-4 min-h-24 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        </div>
+
+        <button type="submit" disabled={saving || loading || rooms.length === 0} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
+          {saving ? "Creating..." : "Create manual booking"}
+        </button>
+      </form>
+    </section>
+  );
+}
+
+export default CreateManualBooking;
