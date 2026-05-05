@@ -32,6 +32,7 @@ const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-
 
 function Bookings() {
   const [bookings, setBookings] = useState([]);
+  const [roomTypes, setRoomTypes] = useState([]);
   const [filters, setFilters] = useState({ bookingStatus: "", roomType: "all" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -73,6 +74,30 @@ function Bookings() {
     loadBookings();
   }, [params]);
 
+  useEffect(() => {
+    let ignore = false;
+
+    const loadRoomTypes = async () => {
+      try {
+        const response = await api.get("/rooms/types");
+
+        if (!ignore) {
+          setRoomTypes(response.data.data || []);
+        }
+      } catch {
+        if (!ignore) {
+          setRoomTypes([]);
+        }
+      }
+    };
+
+    loadRoomTypes();
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
   const handleFilterChange = (event) => {
     setFilters((current) => ({
       ...current,
@@ -103,9 +128,11 @@ function Bookings() {
         </select>
         <select name="roomType" value={filters.roomType} onChange={handleFilterChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
           <option value="all">All room types</option>
-          <option value="deluxe">Deluxe</option>
-          <option value="suite">Suite</option>
-          <option value="superior">Superior</option>
+          {roomTypes.map((roomType) => (
+            <option key={roomType.roomType} value={roomType.roomType}>
+              {roomType.label || roomType.roomType}
+            </option>
+          ))}
         </select>
         <button type="button" onClick={loadBookings} disabled={loading} className="min-h-11 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 disabled:text-gray-400">
           {loading ? "Loading..." : "Refresh"}

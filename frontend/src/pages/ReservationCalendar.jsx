@@ -9,12 +9,6 @@ const statusClasses = {
   cancelled: "bg-gray-400 text-white"
 };
 
-const roomTypeLabels = {
-  deluxe: "Deluxe",
-  suite: "Suite",
-  superior: "Superior"
-};
-
 const toDateInput = (date) => date.toISOString().slice(0, 10);
 
 const startOfMonth = () => {
@@ -55,6 +49,7 @@ function ReservationCalendar() {
     roomType: "all"
   });
   const [grid, setGrid] = useState({ dates: [], roomGroups: [] });
+  const [roomTypes, setRoomTypes] = useState([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -62,6 +57,13 @@ function ReservationCalendar() {
   const gridTemplateColumns = useMemo(
     () => `repeat(${grid.dates.length || 1}, minmax(${dayWidth}px, ${dayWidth}px))`,
     [grid.dates.length]
+  );
+  const roomTypeLabels = useMemo(
+    () =>
+      Object.fromEntries(
+        roomTypes.map((roomType) => [roomType.roomType, roomType.label || roomType.roomType])
+      ),
+    [roomTypes]
   );
 
   const loadCalendar = async () => {
@@ -80,6 +82,30 @@ function ReservationCalendar() {
 
   useEffect(() => {
     loadCalendar();
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+
+    const loadRoomTypes = async () => {
+      try {
+        const response = await api.get("/rooms/types");
+
+        if (!ignore) {
+          setRoomTypes(response.data.data || []);
+        }
+      } catch {
+        if (!ignore) {
+          setRoomTypes([]);
+        }
+      }
+    };
+
+    loadRoomTypes();
+
+    return () => {
+      ignore = true;
+    };
   }, []);
 
   const handleChange = (event) => {
@@ -106,9 +132,11 @@ function ReservationCalendar() {
         <input name="endDate" type="date" value={filters.endDate} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <select name="roomType" value={filters.roomType} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
           <option value="all">All room types</option>
-          <option value="deluxe">Deluxe</option>
-          <option value="suite">Suite</option>
-          <option value="superior">Superior</option>
+          {roomTypes.map((roomType) => (
+            <option key={roomType.roomType} value={roomType.roomType}>
+              {roomType.label || roomType.roomType}
+            </option>
+          ))}
         </select>
         <div className="flex items-center gap-3 text-xs text-gray-600">
           <span className="inline-flex items-center gap-1"><span className="h-3 w-3 rounded bg-green-600" /> Success</span>

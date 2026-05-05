@@ -6,8 +6,9 @@ import { useSortableData } from "../hooks/useSortableData";
 const emptyForm = {
   name: "",
   roomNumber: "",
-  roomType: "deluxe",
+  roomType: "",
   capacity: "",
+  childCapacity: "",
   basePrice: "",
   status: "active"
 };
@@ -17,6 +18,7 @@ const roomSortAccessors = {
   roomNumber: (room) => room.roomNumber,
   roomType: (room) => room.roomType,
   capacity: (room) => room.capacity || 0,
+  childCapacity: (room) => room.childCapacity || 0,
   basePrice: (room) => room.basePrice || 0,
   status: (room) => room.status
 };
@@ -84,6 +86,7 @@ function Rooms() {
     const payload = {
       ...form,
       capacity: Number(form.capacity),
+      childCapacity: Number(form.childCapacity || 0),
       basePrice: Number(form.basePrice || 0)
     };
 
@@ -110,8 +113,9 @@ function Rooms() {
     setForm({
       name: room.name || "",
       roomNumber: room.roomNumber || "",
-      roomType: room.roomType || "deluxe",
+      roomType: room.roomType || "",
       capacity: room.capacity || "",
+      childCapacity: room.childCapacity || "",
       basePrice: room.basePrice || "",
       status: room.status || "active"
     });
@@ -144,12 +148,9 @@ function Rooms() {
       <form className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-3" onSubmit={handleSubmit}>
         <input name="name" value={form.name} onChange={handleChange} required placeholder="Room name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="roomNumber" value={form.roomNumber} onChange={handleChange} required placeholder="Room number, e.g. 101" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <select name="roomType" value={form.roomType} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
-          <option value="deluxe">Deluxe</option>
-          <option value="suite">Suite</option>
-          <option value="superior">Superior</option>
-        </select>
-        <input name="capacity" type="number" min="1" value={form.capacity} onChange={handleChange} required placeholder="Capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="roomType" value={form.roomType} onChange={handleChange} required placeholder="Room type, e.g. family_suite" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="capacity" type="number" min="1" value={form.capacity} onChange={handleChange} required placeholder="Adult capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="childCapacity" type="number" min="0" value={form.childCapacity} onChange={handleChange} placeholder="Child capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="basePrice" type="number" min="0" value={form.basePrice} onChange={handleChange} placeholder="Base price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <select name="status" value={form.status} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
           <option value="active">Active</option>
@@ -178,7 +179,8 @@ function Rooms() {
               <SortHeader label="Room number" sortKey="roomNumber" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Room type" sortKey="roomType" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Name" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
-              <SortHeader label="Capacity" sortKey="capacity" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Adults" sortKey="capacity" sortConfig={sortConfig} onSort={requestSort} />
+              <SortHeader label="Children" sortKey="childCapacity" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Base price" sortKey="basePrice" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
@@ -191,6 +193,7 @@ function Rooms() {
                 <td className="px-4 py-3 capitalize">{room.roomType}</td>
                 <td className="px-4 py-3">{room.name}</td>
                 <td className="px-4 py-3">{room.capacity}</td>
+                <td className="px-4 py-3">{room.childCapacity || 0}</td>
                 <td className="px-4 py-3">{Number(room.basePrice || 0).toLocaleString()}</td>
                 <td className="px-4 py-3 capitalize">{room.status}</td>
                 <td className="px-4 py-3">
@@ -203,7 +206,7 @@ function Rooms() {
             ))}
             {!rooms.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="7">No rooms found. Run the backend room seed script first.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="8">No rooms found. Add your first room above.</td>
               </tr>
             ) : null}
           </tbody>

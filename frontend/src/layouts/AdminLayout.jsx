@@ -7,7 +7,8 @@ const navItems = [
   { to: "/bookings", label: "Bookings" },
   { to: "/waiting-approval", label: "Waiting Approval" },
   { to: "/calendar", label: "Calendar" },
-  { to: "/rooms", label: "Rooms" }
+  { to: "/rooms", label: "Rooms" },
+  { to: "/content", label: "Website Content" }
 ];
 
 function AdminLayout() {

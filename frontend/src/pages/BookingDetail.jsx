@@ -124,7 +124,8 @@ function BookingDetail() {
                 <div><dt className="text-gray-500">Room</dt><dd className="font-medium">{booking.roomId?.roomNumber} {booking.roomId?.name || booking.roomType}</dd></div>
                 <div><dt className="text-gray-500">Check in</dt><dd className="font-medium">{formatDate(booking.checkIn)}</dd></div>
                 <div><dt className="text-gray-500">Check out</dt><dd className="font-medium">{formatDate(booking.checkOut)}</dd></div>
-                <div><dt className="text-gray-500">Guests</dt><dd className="font-medium">{booking.numberOfGuests}</dd></div>
+                <div><dt className="text-gray-500">Adults</dt><dd className="font-medium">{booking.numberOfGuests}</dd></div>
+                <div><dt className="text-gray-500">Children</dt><dd className="font-medium">{booking.numberOfChildren || 0}</dd></div>
                 <div><dt className="text-gray-500">Total</dt><dd className="font-medium">{currencyFormatter.format(booking.totalAmount || 0)}</dd></div>
                 <div><dt className="text-gray-500">Booking status</dt><dd className="font-medium">{booking.bookingStatus}</dd></div>
                 <div><dt className="text-gray-500">Payment status</dt><dd className="font-medium">{booking.paymentStatus}</dd></div>
