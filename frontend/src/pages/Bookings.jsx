@@ -198,7 +198,23 @@ function Bookings() {
                     {booking.bookingStatus}
                   </span>
                 </td>
-                <td className="px-4 py-3">{booking.latestPayment?.paymentStatus || booking.paymentStatus}</td>
+                <td className="px-4 py-3">
+                  <div className="space-y-2">
+                    <p>{booking.latestPayment?.paymentStatus || booking.paymentStatus}</p>
+                    {booking.latestPayment?.proofImageUrl ? (
+                      <a
+                        href={booking.latestPayment.proofImageUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-800"
+                      >
+                        View proof
+                      </a>
+                    ) : (
+                      <span className="text-xs text-gray-500">No proof</span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <Link to={`/bookings/${booking._id}`} className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-800">
                     Detail

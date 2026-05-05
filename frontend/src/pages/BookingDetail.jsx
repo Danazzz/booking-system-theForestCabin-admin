@@ -18,6 +18,26 @@ const rejectionOptions = [
   "other"
 ];
 
+const getPaymentDetails = (payment) => {
+  const snapshot = payment?.paymentOptionSnapshot;
+
+  if (!snapshot) {
+    return null;
+  }
+
+  return {
+    name: snapshot.name,
+    method: snapshot.paymentMethod,
+    bankName: snapshot.bankName || snapshot.providerLabel,
+    accountName: snapshot.accountName,
+    accountNumber: snapshot.accountNumber,
+    merchantName: snapshot.merchantName,
+    qrisCode: snapshot.qrisCode,
+    imageUrl: snapshot.imageUrl,
+    instructions: snapshot.instructions
+  };
+};
+
 function BookingDetail() {
   const { id } = useParams();
   const [booking, setBooking] = useState(null);
@@ -32,6 +52,7 @@ function BookingDetail() {
   const [loading, setLoading] = useState(false);
 
   const latestPayment = payments[0] || booking?.paymentId || null;
+  const paymentDetails = getPaymentDetails(latestPayment);
 
   const loadBooking = async () => {
     setError("");
@@ -165,7 +186,9 @@ function BookingDetail() {
                 <dl className="mt-4 space-y-3 text-sm">
                   <div><dt className="text-gray-500">Number</dt><dd className="font-medium">{invoice.invoiceNumber}</dd></div>
                   <div><dt className="text-gray-500">Status</dt><dd className="font-medium">{invoice.invoiceStatus}</dd></div>
+                  <div><dt className="text-gray-500">Email</dt><dd className="font-medium">{invoice.emailStatus || "pending"}</dd></div>
                   <div><dt className="text-gray-500">Issued</dt><dd className="font-medium">{formatDate(invoice.issuedAt)}</dd></div>
+                  {invoice.emailError ? <div><dt className="text-gray-500">Email error</dt><dd className="font-medium text-red-700">{invoice.emailError}</dd></div> : null}
                 </dl>
               ) : (
                 <p className="mt-4 text-sm text-gray-500">Invoice is generated after approval.</p>
@@ -181,6 +204,49 @@ function BookingDetail() {
                   <p><span className="text-gray-500">Method:</span> <span className="font-medium">{latestPayment.paymentMethod}</span></p>
                   <p><span className="text-gray-500">Status:</span> <span className="font-medium">{latestPayment.paymentStatus}</span></p>
                   <p><span className="text-gray-500">Reference:</span> <span className="font-medium">{latestPayment.transactionReference || "-"}</span></p>
+                  {paymentDetails ? (
+                    <div className="rounded-md border border-gray-200 bg-gray-50 p-3">
+                      <p className="font-semibold text-gray-900">{paymentDetails.name}</p>
+                      {paymentDetails.accountNumber ? (
+                        <p className="mt-2">
+                          <span className="text-gray-500">Account/VA:</span>{" "}
+                          <span className="font-medium">{paymentDetails.accountNumber}</span>
+                        </p>
+                      ) : null}
+                      {paymentDetails.bankName ? (
+                        <p>
+                          <span className="text-gray-500">Bank:</span>{" "}
+                          <span className="font-medium">{paymentDetails.bankName}</span>
+                        </p>
+                      ) : null}
+                      {paymentDetails.accountName ? (
+                        <p>
+                          <span className="text-gray-500">Account name:</span>{" "}
+                          <span className="font-medium">{paymentDetails.accountName}</span>
+                        </p>
+                      ) : null}
+                      {paymentDetails.merchantName ? (
+                        <p>
+                          <span className="text-gray-500">Merchant:</span>{" "}
+                          <span className="font-medium">{paymentDetails.merchantName}</span>
+                        </p>
+                      ) : null}
+                      {paymentDetails.qrisCode ? (
+                        <p className="break-all">
+                          <span className="text-gray-500">QRIS reference:</span>{" "}
+                          <span className="font-medium">{paymentDetails.qrisCode}</span>
+                        </p>
+                      ) : null}
+                      {paymentDetails.imageUrl ? (
+                        <a href={paymentDetails.imageUrl} target="_blank" rel="noreferrer" className="mt-3 block">
+                          <img src={paymentDetails.imageUrl} alt="Payment method" className="max-h-60 rounded-md border border-gray-200 bg-white object-contain" />
+                        </a>
+                      ) : null}
+                      {paymentDetails.instructions ? (
+                        <p className="mt-3 whitespace-pre-line text-gray-600">{paymentDetails.instructions}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {latestPayment.proofImageUrl ? (
                     <a href={latestPayment.proofImageUrl} target="_blank" rel="noreferrer" className="block">
                       <img src={latestPayment.proofImageUrl} alt="Payment proof" className="max-h-[520px] rounded-md border border-gray-200 object-contain" />

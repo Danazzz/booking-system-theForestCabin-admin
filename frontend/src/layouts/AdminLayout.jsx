@@ -8,6 +8,7 @@ const navItems = [
   { to: "/waiting-approval", label: "Waiting Approval" },
   { to: "/calendar", label: "Calendar" },
   { to: "/rooms", label: "Rooms" },
+  { to: "/payments", label: "Payments" },
   { to: "/promos", label: "Promos" },
   { to: "/gallery", label: "Gallery" }
 ];

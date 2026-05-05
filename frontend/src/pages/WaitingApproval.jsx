@@ -74,7 +74,7 @@ function WaitingApproval() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Waiting Approval</h1>
-          <p className="mt-1 text-sm text-gray-500">Review manual transfer proof before confirming bookings.</p>
+          <p className="mt-1 text-sm text-gray-500">Review payment proof before confirming bookings.</p>
         </div>
         <button type="button" onClick={loadBookings} disabled={loading} className="min-h-11 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 disabled:text-gray-400">
           {loading ? "Loading..." : "Refresh"}

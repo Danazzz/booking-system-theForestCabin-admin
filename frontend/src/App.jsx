@@ -6,6 +6,7 @@ import Bookings from "./pages/Bookings";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Gallery from "./pages/Gallery";
+import Payments from "./pages/Payments";
 import Promos from "./pages/Promos";
 import ReservationCalendar from "./pages/ReservationCalendar";
 import Rooms from "./pages/Rooms";
@@ -29,6 +30,7 @@ function App() {
         <Route path="waiting-approval" element={<WaitingApproval />} />
         <Route path="calendar" element={<ReservationCalendar />} />
         <Route path="rooms" element={<Rooms />} />
+        <Route path="payments" element={<Payments />} />
         <Route path="promos" element={<Promos />} />
         <Route path="gallery" element={<Gallery />} />
       </Route>
