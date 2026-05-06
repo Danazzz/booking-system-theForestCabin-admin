@@ -9,6 +9,7 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
 });
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
+const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : "-");
 const formatSource = (source) =>
   source === "manual_admin" ? "Manual admin" : "Website direct";
 
@@ -67,6 +68,7 @@ function BookingDetail() {
     latestPayment;
   const canCancelBooking =
     booking && !["cancelled", "rejected"].includes(booking.bookingStatus);
+  const canSendPaymentReminder = booking?.bookingStatus === "pending_payment";
 
   const loadBooking = async () => {
     setError("");
@@ -209,6 +211,24 @@ function BookingDetail() {
     }
   };
 
+  const sendPaymentReminder = async () => {
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await api.post(`/admin/bookings/${booking._id}/payment-reminder`);
+      const result = response.data.data;
+      const suffix = result?.sent ? " Email sent." : ` ${result?.reason || "Email was not sent."}`;
+
+      setMessage(`Payment reminder processed.${suffix}`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to send payment reminder");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!booking && !error) {
     return <p className="text-sm text-gray-500">Loading booking detail...</p>;
   }
@@ -247,6 +267,7 @@ function BookingDetail() {
                 <div><dt className="text-gray-500">Source</dt><dd className="font-medium">{formatSource(booking.source)}</dd></div>
                 <div><dt className="text-gray-500">Booking status</dt><dd className="font-medium">{booking.bookingStatus}</dd></div>
                 <div><dt className="text-gray-500">Payment status</dt><dd className="font-medium">{booking.paymentStatus}</dd></div>
+                {booking.paymentDueAt ? <div><dt className="text-gray-500">Payment deadline</dt><dd className="font-medium">{formatDateTime(booking.paymentDueAt)}</dd></div> : null}
                 {booking.rejectionReason ? <div><dt className="text-gray-500">Rejection</dt><dd className="font-medium">{booking.rejectionReason}</dd></div> : null}
                 {booking.cancellationReason ? <div><dt className="text-gray-500">Cancellation</dt><dd className="font-medium">{booking.cancellationReason}</dd></div> : null}
                 {booking.cancelledAt ? <div><dt className="text-gray-500">Cancelled at</dt><dd className="font-medium">{formatDate(booking.cancelledAt)}</dd></div> : null}
@@ -374,6 +395,16 @@ function BookingDetail() {
                     Reject
                   </button>
                 </div>
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="font-semibold">Payment Reminder</h2>
+                <p className="mt-3 text-sm text-gray-600">
+                  Send a reminder email when availability is approved but the guest has not paid yet.
+                </p>
+                <button type="button" onClick={sendPaymentReminder} disabled={loading || !canSendPaymentReminder} className="mt-4 min-h-11 w-full rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 disabled:text-gray-400">
+                  Send payment reminder
+                </button>
               </div>
 
               <div className="rounded-md border border-red-200 bg-white p-4 shadow-sm">

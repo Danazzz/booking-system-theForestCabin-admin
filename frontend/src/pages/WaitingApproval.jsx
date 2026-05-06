@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import api from "../api/axios";
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
+const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : "-");
 const statusLabels = {
   waiting_availability_approval: "Waiting availability approval",
   pending_payment: "Pending payment",
@@ -137,6 +138,7 @@ function WaitingApproval() {
                   <p><span className="text-gray-500">Payment:</span> <span className="font-medium">{payment?.paymentMethod || "-"}</span></p>
                   <p><span className="text-gray-500">Payment status:</span> <span className="font-medium">{payment?.paymentStatus || "-"}</span></p>
                   <p><span className="text-gray-500">Amount:</span> <span className="font-medium">{Number(booking.totalAmount || 0).toLocaleString()}</span></p>
+                  {booking.paymentDueAt ? <p><span className="text-gray-500">Payment deadline:</span> <span className="font-medium">{formatDateTime(booking.paymentDueAt)}</span></p> : null}
                 </div>
                 {waitingAvailability ? (
                   <div className="mt-4 flex flex-wrap gap-2">
