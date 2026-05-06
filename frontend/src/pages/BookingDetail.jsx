@@ -50,6 +50,9 @@ function BookingDetail() {
     adminNote: "",
     rejectionReason: "invalid_payment_proof"
   });
+  const [emailForm, setEmailForm] = useState({
+    guestEmail: ""
+  });
   const [cancelForm, setCancelForm] = useState({
     adminNote: "",
     cancellationReason: "guest_cancelled"
@@ -69,17 +72,24 @@ function BookingDetail() {
   const canCancelBooking =
     booking && !["cancelled", "rejected"].includes(booking.bookingStatus);
   const canSendPaymentReminder = booking?.bookingStatus === "pending_payment";
+  const canResendBookingEmail =
+    booking?.bookingStatus === "pending_payment" ||
+    (booking?.bookingStatus === "rejected" &&
+      booking?.rejectionReason === "no_room_available");
 
   const loadBooking = async () => {
     setError("");
 
     try {
       const response = await api.get(`/admin/bookings/${id}`);
-      setBooking(response.data.data.booking);
+      const nextBooking = response.data.data.booking;
+
+      setBooking(nextBooking);
+      setEmailForm({ guestEmail: nextBooking?.guestEmail || "" });
       setPayments(response.data.data.payments || []);
 
-      if (response.data.data.booking?.invoiceId?._id) {
-        setInvoice(response.data.data.booking.invoiceId);
+      if (nextBooking?.invoiceId?._id) {
+        setInvoice(nextBooking.invoiceId);
       } else {
         setInvoice(null);
       }
@@ -98,6 +108,7 @@ function BookingDetail() {
         if (!ignore) {
           const nextBooking = response.data.data.booking;
           setBooking(nextBooking);
+          setEmailForm({ guestEmail: nextBooking?.guestEmail || "" });
           setPayments(response.data.data.payments || []);
           setInvoice(nextBooking?.invoiceId?._id ? nextBooking.invoiceId : null);
           setError("");
@@ -118,6 +129,13 @@ function BookingDetail() {
 
   const handleChange = (event) => {
     setForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value
+    }));
+  };
+
+  const handleEmailChange = (event) => {
+    setEmailForm((current) => ({
       ...current,
       [event.target.name]: event.target.value
     }));
@@ -224,6 +242,46 @@ function BookingDetail() {
       setMessage(`Payment reminder processed.${suffix}`);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to send payment reminder");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateGuestEmail = async () => {
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await api.patch(`/admin/bookings/${booking._id}/guest-email`, emailForm);
+      const nextBooking = response.data.data;
+
+      setBooking(nextBooking);
+      setEmailForm({ guestEmail: nextBooking?.guestEmail || "" });
+      setMessage("Guest email updated. You can resend the booking email now.");
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to update guest email");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendBookingEmail = async () => {
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await api.post(`/admin/bookings/${booking._id}/email/resend`);
+      const result = response.data.data.email;
+      const nextBooking = response.data.data.booking;
+      const suffix = result?.sent ? " Email sent." : ` ${result?.reason || "Email was not sent."}`;
+
+      setBooking(nextBooking);
+      setEmailForm({ guestEmail: nextBooking?.guestEmail || "" });
+      setMessage(`Booking email resend processed.${suffix}`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to resend booking email");
     } finally {
       setLoading(false);
     }
@@ -356,6 +414,27 @@ function BookingDetail() {
             </div>
 
             <div className="space-y-4">
+              <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="font-semibold">Guest Email</h2>
+                <input name="guestEmail" type="email" value={emailForm.guestEmail} onChange={handleEmailChange} placeholder="Guest email" className="mt-4 min-h-11 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <button type="button" onClick={updateGuestEmail} disabled={loading} className="min-h-11 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 disabled:text-gray-400">
+                    Update email
+                  </button>
+                  <button type="button" onClick={resendBookingEmail} disabled={loading || !emailForm.guestEmail || !canResendBookingEmail} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
+                    Resend booking email
+                  </button>
+                </div>
+                <dl className="mt-4 space-y-2 text-sm">
+                  <div><dt className="text-gray-500">Delivery status</dt><dd className="font-medium">{booking.emailDeliveryStatus || "pending"}</dd></div>
+                  {booking.emailDeliveryType ? <div><dt className="text-gray-500">Email type</dt><dd className="font-medium">{booking.emailDeliveryType}</dd></div> : null}
+                  {booking.emailDeliveryRecipient ? <div><dt className="text-gray-500">Last recipient</dt><dd className="font-medium">{booking.emailDeliveryRecipient}</dd></div> : null}
+                  {booking.emailLastAttemptedAt ? <div><dt className="text-gray-500">Last attempted</dt><dd className="font-medium">{formatDateTime(booking.emailLastAttemptedAt)}</dd></div> : null}
+                  {booking.emailLastSentAt ? <div><dt className="text-gray-500">Last sent</dt><dd className="font-medium">{formatDateTime(booking.emailLastSentAt)}</dd></div> : null}
+                  {booking.emailDeliveryError ? <div><dt className="text-gray-500">Email error</dt><dd className="font-medium text-red-700">{booking.emailDeliveryError}</dd></div> : null}
+                </dl>
+              </div>
+
               <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
                 <h2 className="font-semibold">Availability Review</h2>
                 {canReviewAvailability ? (
