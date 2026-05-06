@@ -49,12 +49,24 @@ function BookingDetail() {
     adminNote: "",
     rejectionReason: "invalid_payment_proof"
   });
+  const [cancelForm, setCancelForm] = useState({
+    adminNote: "",
+    cancellationReason: "guest_cancelled"
+  });
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
 
   const latestPayment = payments[0] || booking?.paymentId || null;
   const paymentDetails = getPaymentDetails(latestPayment);
+  const canReviewAvailability =
+    booking?.bookingStatus === "waiting_availability_approval";
+  const canReviewPayment =
+    booking &&
+    !["success", "cancelled", "rejected"].includes(booking.bookingStatus) &&
+    latestPayment;
+  const canCancelBooking =
+    booking && !["cancelled", "rejected"].includes(booking.bookingStatus);
 
   const loadBooking = async () => {
     setError("");
@@ -109,6 +121,13 @@ function BookingDetail() {
     }));
   };
 
+  const handleCancelChange = (event) => {
+    setCancelForm((current) => ({
+      ...current,
+      [event.target.name]: event.target.value
+    }));
+  };
+
   const runPaymentAction = async (action) => {
     if (!latestPayment?._id) {
       setError("No payment record found for this booking.");
@@ -135,6 +154,56 @@ function BookingDetail() {
       await loadBooking();
     } catch (err) {
       setError(err.response?.data?.message || `Failed to ${action} payment`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const runAvailabilityAction = async (action) => {
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await api.patch(`/admin/bookings/${booking._id}/availability/${action}`, {
+        rejectionReason: "no_room_available",
+        adminNote:
+          action === "approve"
+            ? form.adminNote || "Room availability approved. Guest can continue payment."
+            : form.adminNote || "Requested dates are not available."
+      });
+      const nextBooking = response.data.data.booking;
+
+      setBooking(nextBooking);
+      setMessage(
+        action === "approve"
+          ? "Availability approved. Guest can continue payment."
+          : "Booking rejected and guest will be notified."
+      );
+      await loadBooking();
+    } catch (err) {
+      setError(err.response?.data?.message || `Failed to ${action} availability`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cancelBooking = async () => {
+    setLoading(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await api.patch(`/admin/bookings/${booking._id}/cancel`, cancelForm);
+      const nextBooking = response.data.data.booking;
+
+      setBooking(nextBooking);
+      setPayments(response.data.data.payments || []);
+      setInvoice(nextBooking?.invoiceId?._id ? nextBooking.invoiceId : null);
+      setMessage("Booking cancelled. Calendar event and invoice were updated.");
+      await loadBooking();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to cancel booking");
     } finally {
       setLoading(false);
     }
@@ -179,6 +248,8 @@ function BookingDetail() {
                 <div><dt className="text-gray-500">Booking status</dt><dd className="font-medium">{booking.bookingStatus}</dd></div>
                 <div><dt className="text-gray-500">Payment status</dt><dd className="font-medium">{booking.paymentStatus}</dd></div>
                 {booking.rejectionReason ? <div><dt className="text-gray-500">Rejection</dt><dd className="font-medium">{booking.rejectionReason}</dd></div> : null}
+                {booking.cancellationReason ? <div><dt className="text-gray-500">Cancellation</dt><dd className="font-medium">{booking.cancellationReason}</dd></div> : null}
+                {booking.cancelledAt ? <div><dt className="text-gray-500">Cancelled at</dt><dd className="font-medium">{formatDate(booking.cancelledAt)}</dd></div> : null}
                 {booking.adminNote ? <div><dt className="text-gray-500">Admin note</dt><dd className="font-medium">{booking.adminNote}</dd></div> : null}
               </dl>
             </div>
@@ -263,21 +334,63 @@ function BookingDetail() {
               )}
             </div>
 
-            <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
-              <h2 className="font-semibold">Review Payment</h2>
-              <textarea name="adminNote" value={form.adminNote} onChange={handleChange} placeholder="Admin note" className="mt-4 min-h-24 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-              <select name="rejectionReason" value={form.rejectionReason} onChange={handleChange} className="mt-3 min-h-11 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
-                {rejectionOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                <button type="button" onClick={() => runPaymentAction("approve")} disabled={loading || booking.bookingStatus === "success"} className="min-h-11 rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
-                  Approve
+            <div className="space-y-4">
+              <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="font-semibold">Availability Review</h2>
+                {canReviewAvailability ? (
+                  <>
+                    <p className="mt-3 text-sm text-gray-600">
+                      Approve only if a room is available for the requested dates. Payment opens after approval.
+                    </p>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      <button type="button" onClick={() => runAvailabilityAction("approve")} disabled={loading} className="min-h-11 rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
+                        Approve availability
+                      </button>
+                      <button type="button" onClick={() => runAvailabilityAction("reject")} disabled={loading} className="min-h-11 rounded-md border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 disabled:text-gray-400">
+                        No room available
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p className="mt-3 text-sm text-gray-500">
+                    Availability review is only needed for new guest requests.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
+                <h2 className="font-semibold">Review Payment</h2>
+                <textarea name="adminNote" value={form.adminNote} onChange={handleChange} placeholder="Admin note" className="mt-4 min-h-24 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+                <select name="rejectionReason" value={form.rejectionReason} onChange={handleChange} className="mt-3 min-h-11 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+                  {rejectionOptions.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  <button type="button" onClick={() => runPaymentAction("approve")} disabled={loading || !canReviewPayment} className="min-h-11 rounded-md bg-green-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
+                    Approve
+                  </button>
+                  <button type="button" onClick={() => runPaymentAction("reject")} disabled={loading || !canReviewPayment} className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
+                    Reject
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-md border border-red-200 bg-white p-4 shadow-sm">
+                <h2 className="font-semibold text-red-900">Cancel Booking</h2>
+                <select name="cancellationReason" value={cancelForm.cancellationReason} onChange={handleCancelChange} className="mt-4 min-h-11 w-full rounded-md border border-red-200 px-3 py-2 text-sm outline-none focus:border-red-700">
+                  <option value="guest_cancelled">guest_cancelled</option>
+                  <option value="no_room_available">no_room_available</option>
+                  <option value="payment_not_received">payment_not_received</option>
+                  <option value="other">other</option>
+                </select>
+                <textarea name="adminNote" value={cancelForm.adminNote} onChange={handleCancelChange} placeholder="Cancellation note" className="mt-3 min-h-24 w-full rounded-md border border-red-200 px-3 py-2 text-sm outline-none focus:border-red-700" />
+                <button type="button" onClick={cancelBooking} disabled={loading || !canCancelBooking} className="mt-4 min-h-11 w-full rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
+                  Cancel booking
                 </button>
-                <button type="button" onClick={() => runPaymentAction("reject")} disabled={loading || booking.bookingStatus === "success"} className="min-h-11 rounded-md bg-red-700 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
-                  Reject
-                </button>
+                {booking.bookingStatus === "success" && booking.paymentStatus === "paid" ? (
+                  <p className="mt-3 text-sm text-red-700">Paid bookings will be marked as refund_required.</p>
+                ) : null}
               </div>
             </div>
           </div>

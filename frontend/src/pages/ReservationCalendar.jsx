@@ -5,6 +5,7 @@ const statusClasses = {
   success: "bg-green-600 text-white",
   waiting_admin_approval: "bg-amber-400 text-amber-950",
   pending_payment: "bg-blue-400 text-blue-950",
+  waiting_availability_approval: "bg-purple-400 text-purple-950",
   rejected: "bg-red-500 text-white",
   cancelled: "bg-gray-400 text-white"
 };

@@ -17,7 +17,9 @@ function Dashboard() {
   const [loading, setLoading] = useState(false);
 
   const stats = useMemo(() => {
-    const waiting = bookings.filter((booking) => booking.bookingStatus === "waiting_admin_approval").length;
+    const waiting = bookings.filter((booking) =>
+      ["waiting_availability_approval", "waiting_admin_approval"].includes(booking.bookingStatus)
+    ).length;
     const success = bookings.filter((booking) => booking.bookingStatus === "success").length;
     const pendingPayment = bookings.filter((booking) => booking.bookingStatus === "pending_payment").length;
 

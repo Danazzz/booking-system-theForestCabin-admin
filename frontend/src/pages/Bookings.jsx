@@ -11,6 +11,7 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
 });
 
 const statusStyles = {
+  waiting_availability_approval: "bg-purple-50 text-purple-700",
   pending_payment: "bg-blue-50 text-blue-700",
   waiting_admin_approval: "bg-amber-50 text-amber-700",
   success: "bg-green-50 text-green-700",
@@ -162,6 +163,7 @@ function Bookings() {
       <div className="grid gap-3 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-4">
         <select name="bookingStatus" value={filters.bookingStatus} onChange={handleFilterChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
           <option value="">All statuses</option>
+          <option value="waiting_availability_approval">Waiting availability approval</option>
           <option value="pending_payment">Pending payment</option>
           <option value="waiting_admin_approval">Waiting admin approval</option>
           <option value="success">Success</option>
