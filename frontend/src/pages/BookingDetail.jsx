@@ -11,7 +11,11 @@ const currencyFormatter = new Intl.NumberFormat("id-ID", {
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : "-");
 const formatSource = (source) =>
-  source === "manual_admin" ? "Manual admin" : "Website direct";
+  String(source || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "-";
 
 const rejectionOptions = [
   "no_room_available",
@@ -322,7 +326,7 @@ function BookingDetail() {
                 <div><dt className="text-gray-500">Children</dt><dd className="font-medium">{booking.numberOfChildren || 0}</dd></div>
                 <div><dt className="text-gray-500">Total</dt><dd className="font-medium">{currencyFormatter.format(booking.totalAmount || 0)}</dd></div>
                 {booking.promoName ? <div><dt className="text-gray-500">Promo</dt><dd className="font-medium">{booking.promoName}</dd></div> : null}
-                <div><dt className="text-gray-500">Source</dt><dd className="font-medium">{formatSource(booking.source)}</dd></div>
+                <div><dt className="text-gray-500">Source</dt><dd className="font-medium">{booking.sourceName || formatSource(booking.source)}</dd></div>
                 <div><dt className="text-gray-500">Booking status</dt><dd className="font-medium">{booking.bookingStatus}</dd></div>
                 <div><dt className="text-gray-500">Payment status</dt><dd className="font-medium">{booking.paymentStatus}</dd></div>
                 {booking.paymentDueAt ? <div><dt className="text-gray-500">Payment deadline</dt><dd className="font-medium">{formatDateTime(booking.paymentDueAt)}</dd></div> : null}

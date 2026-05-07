@@ -26,17 +26,22 @@ const sortAccessors = {
   checkIn: (booking) => booking.checkIn || "",
   checkOut: (booking) => booking.checkOut || "",
   status: (booking) => booking.bookingStatus || "",
-  source: (booking) => booking.source || "",
+  source: (booking) => booking.sourceName || booking.source || "",
   total: (booking) => booking.totalAmount || 0
 };
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
-const formatSource = (source) =>
-  source === "manual_admin" ? "Manual admin" : "Website direct";
+const humanizeSource = (source) =>
+  String(source || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "-";
 
 function Bookings() {
   const [bookings, setBookings] = useState([]);
   const [roomTypes, setRoomTypes] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [filters, setFilters] = useState({
     bookingStatus: "",
     roomType: "all",
@@ -49,6 +54,48 @@ function Bookings() {
     sortConfig,
     requestSort
   } = useSortableData(bookings, sortAccessors, { key: "checkIn", direction: "desc" });
+
+  const channelLabels = useMemo(() => {
+    const labels = new Map();
+
+    channels.forEach((channel) => {
+      labels.set(channel.key, channel.name);
+    });
+
+    bookings.forEach((booking) => {
+      if (booking.source && booking.sourceName) {
+        labels.set(booking.source, booking.sourceName);
+      }
+    });
+
+    labels.set("direct", labels.get("direct") || "Website direct");
+
+    return labels;
+  }, [bookings, channels]);
+
+  const sourceOptions = useMemo(() => {
+    const options = new Map(channelLabels);
+
+    bookings.forEach((booking) => {
+      if (booking.source) {
+        options.set(
+          booking.source,
+          booking.sourceName || options.get(booking.source) || humanizeSource(booking.source)
+        );
+      }
+    });
+
+    if (filters.source !== "all") {
+      options.set(filters.source, options.get(filters.source) || humanizeSource(filters.source));
+    }
+
+    return Array.from(options.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [bookings, channelLabels, filters.source]);
+
+  const formatSource = (booking) =>
+    booking.sourceName || channelLabels.get(booking.source) || humanizeSource(booking.source);
 
   const params = useMemo(() => {
     const next = {};
@@ -114,21 +161,26 @@ function Bookings() {
   useEffect(() => {
     let ignore = false;
 
-    const loadRoomTypes = async () => {
+    const loadFilters = async () => {
       try {
-        const response = await api.get("/rooms/types");
+        const [roomTypesResponse, channelsResponse] = await Promise.all([
+          api.get("/rooms/types"),
+          api.get("/channels", { params: { includeInactive: "true" } })
+        ]);
 
         if (!ignore) {
-          setRoomTypes(response.data.data || []);
+          setRoomTypes(roomTypesResponse.data.data || []);
+          setChannels(channelsResponse.data.data || []);
         }
       } catch {
         if (!ignore) {
           setRoomTypes([]);
+          setChannels([]);
         }
       }
     };
 
-    loadRoomTypes();
+    loadFilters();
 
     return () => {
       ignore = true;
@@ -180,8 +232,11 @@ function Bookings() {
         </select>
         <select name="source" value={filters.source} onChange={handleFilterChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
           <option value="all">All sources</option>
-          <option value="direct">Website direct</option>
-          <option value="manual_admin">Manual admin</option>
+          {sourceOptions.map((source) => (
+            <option key={source.value} value={source.value}>
+              {source.label}
+            </option>
+          ))}
         </select>
         <button type="button" onClick={loadBookings} disabled={loading} className="min-h-11 rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-800 disabled:text-gray-400">
           {loading ? "Loading..." : "Refresh"}
@@ -222,7 +277,7 @@ function Bookings() {
                     {booking.bookingStatus}
                   </span>
                 </td>
-                <td className="px-4 py-3">{formatSource(booking.source)}</td>
+                <td className="px-4 py-3">{formatSource(booking)}</td>
                 <td className="px-4 py-3">
                   <div className="space-y-2">
                     <p>{booking.latestPayment?.paymentStatus || booking.paymentStatus}</p>

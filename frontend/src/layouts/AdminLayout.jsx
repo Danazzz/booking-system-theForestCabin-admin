@@ -8,6 +8,7 @@ const navItems = [
   { to: "/waiting-approval", label: "Waiting Approval" },
   { to: "/calendar", label: "Calendar" },
   { to: "/rooms", label: "Rooms" },
+  { to: "/channels", label: "Booking Sources" },
   { to: "/payments", label: "Payments" },
   { to: "/invoice-settings", label: "Invoice Settings" },
   { to: "/promos", label: "Promos" },

@@ -15,6 +15,9 @@ const channelSortAccessors = {
   status: (channel) => channel.isActive
 };
 
+const getErrorMessage = (error, fallback) =>
+  error.response?.data?.message || error.response?.data?.error || fallback;
+
 function Channels() {
   const [channels, setChannels] = useState([]);
   const [form, setForm] = useState(emptyForm);
@@ -28,7 +31,7 @@ function Channels() {
     requestSort
   } = useSortableData(channels, channelSortAccessors, { key: "name", direction: "asc" });
 
-  const loadChannels = async (params = {}) => {
+  const loadChannels = async (params = { includeInactive: "true" }) => {
     const response = await api.get("/channels", { params });
     setChannels(response.data.data || []);
   };
@@ -38,14 +41,16 @@ function Channels() {
 
     const loadInitialChannels = async () => {
       try {
-        const response = await api.get("/channels");
+        const response = await api.get("/channels", {
+          params: { includeInactive: "true" }
+        });
 
         if (!ignore) {
           setChannels(response.data.data || []);
         }
       } catch (err) {
         if (!ignore) {
-          setError(err.response?.data?.error || "Failed to load channels");
+          setError(getErrorMessage(err, "Failed to load channels"));
         }
       }
     };
@@ -90,7 +95,7 @@ function Channels() {
       resetForm();
       await loadChannels();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to save channel");
+      setError(getErrorMessage(err, "Failed to save channel"));
     } finally {
       setLoading(false);
     }
@@ -118,20 +123,20 @@ function Channels() {
       setMessage("Channel disabled");
       await loadChannels();
     } catch (err) {
-      setError(err.response?.data?.error || "Failed to disable channel");
+      setError(getErrorMessage(err, "Failed to disable channel"));
     }
   };
 
   return (
     <section className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Channels</h1>
-        <p className="mt-1 text-sm text-gray-500">Manage dynamic booking sources.</p>
+        <h1 className="text-2xl font-semibold">Booking Sources</h1>
+        <p className="mt-1 text-sm text-gray-500">Manage sources for manual bookings, such as direct, OTA, WhatsApp, or other channels.</p>
       </div>
 
       <form className="grid gap-4 rounded-md border border-gray-200 bg-white p-4 shadow-sm md:grid-cols-4" onSubmit={handleSubmit}>
         <input name="name" value={form.name} onChange={handleChange} required placeholder="Channel name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="type" value={form.type} onChange={handleChange} required placeholder="Type" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="type" value={form.type} onChange={handleChange} required placeholder="Category, e.g. OTA or WhatsApp" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input name="isActive" type="checkbox" checked={form.isActive} onChange={handleChange} />
           Active

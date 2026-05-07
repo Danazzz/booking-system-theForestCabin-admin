@@ -3,6 +3,7 @@ import AdminLayout from "./layouts/AdminLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import BookingDetail from "./pages/BookingDetail";
 import Bookings from "./pages/Bookings";
+import Channels from "./pages/Channels";
 import CreateManualBooking from "./pages/CreateManualBooking";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
@@ -33,6 +34,7 @@ function App() {
         <Route path="waiting-approval" element={<WaitingApproval />} />
         <Route path="calendar" element={<ReservationCalendar />} />
         <Route path="rooms" element={<Rooms />} />
+        <Route path="channels" element={<Channels />} />
         <Route path="payments" element={<Payments />} />
         <Route path="invoice-settings" element={<InvoiceSettings />} />
         <Route path="promos" element={<Promos />} />

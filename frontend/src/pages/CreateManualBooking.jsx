@@ -13,6 +13,8 @@ const emptyForm = {
   numberOfGuests: 2,
   numberOfChildren: 0,
   promoId: "",
+  source: "",
+  sourceName: "",
   bookingStatus: "pending_payment",
   paymentStatus: "unpaid",
   overrideTotal: false,
@@ -83,6 +85,7 @@ function CreateManualBooking() {
   const [form, setForm] = useState(emptyForm);
   const [rooms, setRooms] = useState([]);
   const [promos, setPromos] = useState([]);
+  const [channels, setChannels] = useState([]);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -108,6 +111,7 @@ function CreateManualBooking() {
   const selectedRoom =
     rooms.find((room) => room._id === form.roomId) || filteredRooms[0] || null;
   const selectedPromo = promos.find((promo) => promo._id === form.promoId) || null;
+  const selectedChannel = channels.find((channel) => channel.key === form.source) || null;
   const nights = getNights(form.checkIn, form.checkOut);
   const calculatedSubtotal = nights * Number(selectedRoom?.basePrice || 0);
   const calculatedTotal = Math.max(
@@ -126,19 +130,24 @@ function CreateManualBooking() {
       setError("");
 
       try {
-        const [roomsResponse, promosResponse] = await Promise.all([
+        const [roomsResponse, promosResponse, channelsResponse] = await Promise.all([
           api.get("/rooms", { params: { status: "active" } }),
-          api.get("/promos/active")
+          api.get("/promos/active"),
+          api.get("/channels")
         ]);
 
         if (!ignore) {
           const nextRooms = roomsResponse.data.data || [];
+          const nextChannels = channelsResponse.data.data || [];
           setRooms(nextRooms);
           setPromos(promosResponse.data.data || []);
+          setChannels(nextChannels);
           setForm((current) => ({
             ...current,
             roomType: current.roomType || nextRooms[0]?.roomType || "",
-            roomId: current.roomId || nextRooms[0]?._id || ""
+            roomId: current.roomId || nextRooms[0]?._id || "",
+            source: current.source || nextChannels[0]?.key || "",
+            sourceName: current.sourceName || nextChannels[0]?.name || ""
           }));
         }
       } catch (err) {
@@ -181,6 +190,11 @@ function CreateManualBooking() {
         next.paymentStatus = "unpaid";
       }
 
+      if (name === "source") {
+        const channel = channels.find((item) => item.key === value);
+        next.sourceName = channel?.name || "";
+      }
+
       return next;
     });
   };
@@ -200,7 +214,9 @@ function CreateManualBooking() {
         numberOfChildren: Number(form.numberOfChildren || 0),
         totalAmount: Number(finalTotal || 0),
         overrideTotal: Boolean(form.overrideTotal),
-        promoId: form.promoId || undefined
+        promoId: form.promoId || undefined,
+        source: selectedChannel?.key || form.source,
+        sourceName: selectedChannel?.name || form.sourceName
       };
 
       const response = await api.post("/admin/bookings/manual", payload);
@@ -239,7 +255,23 @@ function CreateManualBooking() {
             <input name="guestName" value={form.guestName} onChange={handleChange} required placeholder="Guest name" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
             <input name="guestPhone" value={form.guestPhone} onChange={handleChange} required placeholder="Phone / WhatsApp" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
             <input name="guestEmail" type="email" value={form.guestEmail} onChange={handleChange} placeholder="Email optional" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+            <select name="source" value={form.source} onChange={handleChange} required disabled={loading || channels.length === 0} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-3">
+              {channels.length ? (
+                channels.map((channel) => (
+                  <option key={channel._id} value={channel.key}>
+                    {channel.name}
+                  </option>
+                ))
+              ) : (
+                <option value="">Add booking channels first</option>
+              )}
+            </select>
           </div>
+          {channels.length === 0 ? (
+            <p className="mt-3 text-sm text-amber-700">
+              Create booking sources in Channels before recording manual bookings.
+            </p>
+          ) : null}
         </div>
 
         <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
@@ -295,7 +327,7 @@ function CreateManualBooking() {
           <textarea name="adminNote" value={form.adminNote} onChange={handleChange} placeholder="Admin note" className="mt-4 min-h-24 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         </div>
 
-        <button type="submit" disabled={saving || loading || rooms.length === 0} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
+        <button type="submit" disabled={saving || loading || rooms.length === 0 || channels.length === 0} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
           {saving ? "Creating..." : "Create manual booking"}
         </button>
       </form>
