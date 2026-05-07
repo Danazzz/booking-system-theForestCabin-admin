@@ -48,6 +48,7 @@ function Dashboard() {
   const [summaryLoading, setSummaryLoading] = useState(false);
 
   const totals = useMemo(() => summary?.totals || {}, [summary]);
+  const emailWarnings = summary?.emailWarnings || {};
   const roomTypeBreakdown = summary?.breakdowns?.byRoomType || [];
   const sourceBreakdown = summary?.breakdowns?.bySource || [];
   const waitingApproval =
@@ -206,6 +207,34 @@ function Dashboard() {
           {summaryLoading ? "Loading..." : "Apply"}
         </button>
       </form>
+
+      <div className={[
+        "rounded-md border p-4 text-sm shadow-sm",
+        emailWarnings.smtpLimitReached
+          ? "border-amber-300 bg-amber-50 text-amber-900"
+          : "border-gray-200 bg-white text-gray-700"
+      ].join(" ")}>
+        <p className="font-semibold">
+          SMTP email limit: {emailWarnings.smtpDailyLimit || 500} emails/day
+        </p>
+        {emailWarnings.smtpLimitReached ? (
+          <p className="mt-1">
+            SMTP daily limit may have been reached. Guests may contact us via WhatsApp while waiting for the quota to reset.
+          </p>
+        ) : (
+          <p className="mt-1">
+            Gmail SMTP has a daily sending limit. If email delivery fails, use WhatsApp.
+          </p>
+        )}
+        {emailWarnings.failedToday ? (
+          <p className="mt-1">
+            Failed email attempts today: {emailWarnings.failedToday}
+            {emailWarnings.limitFailuresToday
+              ? ` (${emailWarnings.limitFailuresToday} likely caused by SMTP limit)`
+              : ""}
+          </p>
+        ) : null}
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {summaryCards.map((card) => (

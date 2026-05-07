@@ -16,6 +16,8 @@ const formatSource = (source) =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ") || "-";
+const isSmtpLimitWarning = (value) =>
+  String(value || "").includes("SMTP_DAILY_LIMIT_REACHED");
 
 const rejectionOptions = [
   "no_room_available",
@@ -346,6 +348,11 @@ function BookingDetail() {
                   <div><dt className="text-gray-500">Email</dt><dd className="font-medium">{invoice.emailStatus || "pending"}</dd></div>
                   <div><dt className="text-gray-500">Issued</dt><dd className="font-medium">{formatDate(invoice.issuedAt)}</dd></div>
                   {invoice.emailError ? <div><dt className="text-gray-500">Email error</dt><dd className="font-medium text-red-700">{invoice.emailError}</dd></div> : null}
+                  {isSmtpLimitWarning(invoice.emailError) ? (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-amber-900">
+                      SMTP daily limit may have been reached. Send the invoice manually if the guest needs it now.
+                    </div>
+                  ) : null}
                 </dl>
               ) : (
                 <p className="mt-4 text-sm text-gray-500">Invoice is generated after approval.</p>
@@ -437,6 +444,11 @@ function BookingDetail() {
                   {booking.emailLastSentAt ? <div><dt className="text-gray-500">Last sent</dt><dd className="font-medium">{formatDateTime(booking.emailLastSentAt)}</dd></div> : null}
                   {booking.emailDeliveryError ? <div><dt className="text-gray-500">Email error</dt><dd className="font-medium text-red-700">{booking.emailDeliveryError}</dd></div> : null}
                 </dl>
+                {isSmtpLimitWarning(booking.emailDeliveryError) ? (
+                  <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    SMTP daily limit may have been reached. Contact this guest manually via WhatsApp, then retry email after the quota resets.
+                  </p>
+                ) : null}
               </div>
 
               <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">
