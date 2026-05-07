@@ -18,6 +18,10 @@ const numberFormatter = new Intl.NumberFormat("id-ID", {
   maximumFractionDigits: 1
 });
 
+const compactNumberFormatter = new Intl.NumberFormat("id-ID", {
+  maximumFractionDigits: 2
+});
+
 const toInputDate = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -49,6 +53,7 @@ function Dashboard() {
 
   const totals = useMemo(() => summary?.totals || {}, [summary]);
   const emailWarnings = summary?.emailWarnings || {};
+  const databaseUsage = summary?.databaseUsage || {};
   const roomTypeBreakdown = summary?.breakdowns?.byRoomType || [];
   const sourceBreakdown = summary?.breakdowns?.bySource || [];
   const waitingApproval =
@@ -208,34 +213,6 @@ function Dashboard() {
         </button>
       </form>
 
-      <div className={[
-        "rounded-md border p-4 text-sm shadow-sm",
-        emailWarnings.smtpLimitReached
-          ? "border-amber-300 bg-amber-50 text-amber-900"
-          : "border-gray-200 bg-white text-gray-700"
-      ].join(" ")}>
-        <p className="font-semibold">
-          SMTP email limit: {emailWarnings.smtpDailyLimit || 500} emails/day
-        </p>
-        {emailWarnings.smtpLimitReached ? (
-          <p className="mt-1">
-            SMTP daily limit may have been reached. Guests may contact us via WhatsApp while waiting for the quota to reset.
-          </p>
-        ) : (
-          <p className="mt-1">
-            Gmail SMTP has a daily sending limit.
-          </p>
-        )}
-        {emailWarnings.failedToday ? (
-          <p className="mt-1">
-            Failed email attempts today: {emailWarnings.failedToday}
-            {emailWarnings.limitFailuresToday
-              ? ` (${emailWarnings.limitFailuresToday} likely caused by SMTP limit)`
-              : ""}
-          </p>
-        ) : null}
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {summaryCards.map((card) => (
           <StatCard key={card.label} label={card.label} value={card.value} />
@@ -321,6 +298,79 @@ function Dashboard() {
               ) : null}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <div className={[
+          "rounded-md border p-4 text-sm shadow-sm",
+          databaseUsage.isNearLimit
+            ? "border-amber-300 bg-amber-50 text-amber-900"
+            : "border-gray-200 bg-white text-gray-700"
+        ].join(" ")}>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-semibold">
+                Database storage: {compactNumberFormatter.format(databaseUsage.usedMb || 0)} MB / {compactNumberFormatter.format(databaseUsage.storageLimitMb || 512)} MB
+              </p>
+              {databaseUsage.available === false ? (
+                <p className="mt-1">
+                  Database usage could not be checked. Please verify MongoDB monitoring manually.
+                </p>
+              ) : databaseUsage.isNearLimit ? (
+                <p className="mt-1">
+                  Database storage is near the configured limit. Export old data and move images to external storage before adding more records.
+                </p>
+              ) : (
+                <p className="mt-1">
+                  Database storage is below the configured warning threshold.
+                </p>
+              )}
+            </div>
+            <div className="min-w-40">
+              <div className="flex items-center justify-between text-xs font-medium">
+                <span>{compactNumberFormatter.format(databaseUsage.usagePercent || 0)}%</span>
+                <span>Warn at {compactNumberFormatter.format(databaseUsage.warningPercent || 80)}%</span>
+              </div>
+              <div className="mt-2 h-2 rounded-full bg-gray-200">
+                <div
+                  className={[
+                    "h-2 rounded-full",
+                    databaseUsage.isNearLimit ? "bg-amber-500" : "bg-green-600"
+                  ].join(" ")}
+                  style={{ width: `${Math.min(databaseUsage.usagePercent || 0, 100)}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className={[
+          "rounded-md border p-4 text-sm shadow-sm",
+          emailWarnings.smtpLimitReached
+            ? "border-amber-300 bg-amber-50 text-amber-900"
+            : "border-gray-200 bg-white text-gray-700"
+        ].join(" ")}>
+          <p className="font-semibold">
+            SMTP email limit: {emailWarnings.smtpDailyLimit || 500} emails/day
+          </p>
+          {emailWarnings.smtpLimitReached ? (
+            <p className="mt-1">
+              SMTP daily limit may have been reached. Guests may contact us via WhatsApp while waiting for the quota to reset.
+            </p>
+          ) : (
+            <p className="mt-1">
+              Gmail SMTP has a daily sending limit.
+            </p>
+          )}
+          {emailWarnings.failedToday ? (
+            <p className="mt-1">
+              Failed email attempts today: {emailWarnings.failedToday}
+              {emailWarnings.limitFailuresToday
+                ? ` (${emailWarnings.limitFailuresToday} likely caused by SMTP limit)`
+                : ""}
+            </p>
+          ) : null}
         </div>
       </div>
     </section>
