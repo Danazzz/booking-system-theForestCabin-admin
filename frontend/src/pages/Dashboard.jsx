@@ -223,7 +223,7 @@ function Dashboard() {
           </p>
         ) : (
           <p className="mt-1">
-            Gmail SMTP has a daily sending limit. If email delivery fails, use WhatsApp.
+            Gmail SMTP has a daily sending limit.
           </p>
         )}
         {emailWarnings.failedToday ? (

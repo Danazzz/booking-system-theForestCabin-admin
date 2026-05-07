@@ -4,6 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
+  { to: "/exports", label: "Data Export" },
   { to: "/bookings", label: "Bookings" },
   { to: "/waiting-approval", label: "Waiting Approval" },
   { to: "/calendar", label: "Calendar" },

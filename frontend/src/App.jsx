@@ -5,6 +5,7 @@ import BookingDetail from "./pages/BookingDetail";
 import Bookings from "./pages/Bookings";
 import Channels from "./pages/Channels";
 import CreateManualBooking from "./pages/CreateManualBooking";
+import DataExport from "./pages/DataExport";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Gallery from "./pages/Gallery";
@@ -28,6 +29,7 @@ function App() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
+        <Route path="exports" element={<DataExport />} />
         <Route path="bookings" element={<Bookings />} />
         <Route path="bookings/new" element={<CreateManualBooking />} />
         <Route path="bookings/:id" element={<BookingDetail />} />
