@@ -148,7 +148,7 @@ function Bookings() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Bookings</h1>
-          <p className="mt-1 text-sm text-gray-500">All website and manual admin bookings from the shared backend.</p>
+          <p className="mt-1 text-sm text-gray-500">Bookings from the website and manual admin entries.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Link to="/bookings/new" className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white">
