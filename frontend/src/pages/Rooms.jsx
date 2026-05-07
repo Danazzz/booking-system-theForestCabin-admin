@@ -14,7 +14,6 @@ const emptyForm = {
   imageUrl: "",
   altText: "",
   details: "",
-  sortOrder: "",
   status: "active"
 };
 
@@ -25,7 +24,6 @@ const roomSortAccessors = {
   capacity: (room) => room.capacity || 0,
   childCapacity: (room) => room.childCapacity || 0,
   basePrice: (room) => room.basePrice || 0,
-  sortOrder: (room) => room.sortOrder || 0,
   status: (room) => room.status
 };
 
@@ -94,7 +92,6 @@ function Rooms() {
       capacity: Number(form.capacity),
       childCapacity: Number(form.childCapacity || 0),
       basePrice: Number(form.basePrice || 0),
-      sortOrder: Number(form.sortOrder || 0),
       details: form.details
     };
 
@@ -129,7 +126,6 @@ function Rooms() {
       imageUrl: room.imageUrl || "",
       altText: room.altText || "",
       details: (room.details || []).join("\n"),
-      sortOrder: room.sortOrder ?? "",
       status: room.status || "active"
     });
   };
@@ -165,7 +161,6 @@ function Rooms() {
         <input name="capacity" type="number" min="1" value={form.capacity} onChange={handleChange} required placeholder="Adult capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="childCapacity" type="number" min="0" value={form.childCapacity} onChange={handleChange} placeholder="Child capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="basePrice" type="number" min="0" value={form.basePrice} onChange={handleChange} placeholder="Base price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="sortOrder" type="number" value={form.sortOrder} onChange={handleChange} placeholder="Display sort order" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Accommodation image URL" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2" />
         <input name="altText" value={form.altText} onChange={handleChange} placeholder="Image alt text" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <textarea name="description" value={form.description} onChange={handleChange} placeholder="Accommodation description shown on user frontend" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-3" />
@@ -201,7 +196,6 @@ function Rooms() {
               <SortHeader label="Adults" sortKey="capacity" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Children" sortKey="childCapacity" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Base price" sortKey="basePrice" sortConfig={sortConfig} onSort={requestSort} />
-              <SortHeader label="Sort" sortKey="sortOrder" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -225,7 +219,6 @@ function Rooms() {
                 <td className="px-4 py-3">{room.capacity}</td>
                 <td className="px-4 py-3">{room.childCapacity || 0}</td>
                 <td className="px-4 py-3">{Number(room.basePrice || 0).toLocaleString()}</td>
-                <td className="px-4 py-3">{room.sortOrder || 0}</td>
                 <td className="px-4 py-3 capitalize">{room.status}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
@@ -237,7 +230,7 @@ function Rooms() {
             ))}
             {!rooms.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="10">No rooms found. Add your first room above.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="9">No rooms found. Add your first room above.</td>
               </tr>
             ) : null}
           </tbody>
