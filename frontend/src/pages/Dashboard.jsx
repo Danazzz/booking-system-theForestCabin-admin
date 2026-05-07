@@ -111,7 +111,7 @@ function Dashboard() {
         value: currencyFormatter.format(totals.potentialRevenue || 0)
       },
       {
-        label: "Needs attention",
+        label: "Open follow-ups",
         value: waitingApproval + Number(totals.pendingPayment || 0)
       }
     ],
