@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import api from "../api/axios";
 import { useAuth } from "../hooks/useAuth";
 
 function Login() {
@@ -23,10 +24,20 @@ function Login() {
     setLoading(true);
 
     try {
-      login(`local-admin-${Date.now()}`);
+      const response = await api.post("/auth/admin/login", {
+        identifier: form.username,
+        password: form.password
+      });
+      const { token, user } = response.data.data || {};
+
+      if (!token) {
+        throw new Error("Login response did not include a token");
+      }
+
+      login(token, user);
       navigate(location.state?.from?.pathname || "/dashboard", { replace: true });
     } catch (err) {
-      setError(err.message || "Login failed");
+      setError(err.response?.data?.message || err.message || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -39,7 +50,7 @@ function Login() {
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm font-medium text-gray-700" htmlFor="username">
-              Username
+              Email or username
             </label>
             <input
               id="username"
