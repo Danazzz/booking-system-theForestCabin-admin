@@ -12,6 +12,7 @@ const emptyForm = {
   basePrice: "",
   description: "",
   imageUrl: "",
+  image: null,
   altText: "",
   details: "",
   status: "active"
@@ -74,10 +75,34 @@ function Rooms() {
     setEditingId("");
   };
 
+  const buildPayload = () => {
+    const payload = new FormData();
+
+    payload.append("name", form.name);
+    payload.append("roomNumber", form.roomNumber);
+    payload.append("roomType", form.roomType);
+    payload.append("capacity", Number(form.capacity));
+    payload.append("childCapacity", Number(form.childCapacity || 0));
+    payload.append("basePrice", Number(form.basePrice || 0));
+    payload.append("description", form.description || "");
+    payload.append("imageUrl", form.imageUrl || "");
+    payload.append("altText", form.altText || "");
+    payload.append("details", form.details || "");
+    payload.append("status", form.status);
+
+    if (form.image) {
+      payload.append("image", form.image);
+    }
+
+    return payload;
+  };
+
   const handleChange = (event) => {
+    const { name, value, type, files } = event.target;
+
     setForm((current) => ({
       ...current,
-      [event.target.name]: event.target.value
+      [name]: type === "file" ? files?.[0] || null : value
     }));
   };
 
@@ -87,15 +112,9 @@ function Rooms() {
     setMessage("");
     setLoading(true);
 
-    const payload = {
-      ...form,
-      capacity: Number(form.capacity),
-      childCapacity: Number(form.childCapacity || 0),
-      basePrice: Number(form.basePrice || 0),
-      details: form.details
-    };
-
     try {
+      const payload = buildPayload();
+
       if (editingId) {
         await api.patch(`/rooms/${editingId}`, payload);
         setMessage("Room updated");
@@ -124,6 +143,7 @@ function Rooms() {
       basePrice: room.basePrice || "",
       description: room.description || "",
       imageUrl: room.imageUrl || "",
+      image: null,
       altText: room.altText || "",
       details: (room.details || []).join("\n"),
       status: room.status || "active"
@@ -162,6 +182,7 @@ function Rooms() {
         <input name="childCapacity" type="number" min="0" value={form.childCapacity} onChange={handleChange} placeholder="Child capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="basePrice" type="number" min="0" value={form.basePrice} onChange={handleChange} placeholder="Base price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Accommodation image URL" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2" />
+        <input name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="altText" value={form.altText} onChange={handleChange} placeholder="Image alt text" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <textarea name="description" value={form.description} onChange={handleChange} placeholder="Accommodation description shown on user frontend" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-3" />
         <textarea name="details" value={form.details} onChange={handleChange} placeholder="Accommodation details, one per line" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-3" />
