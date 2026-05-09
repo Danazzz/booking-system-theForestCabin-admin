@@ -10,6 +10,7 @@ function Login() {
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const sessionExpired = Boolean(location.state?.sessionExpired);
 
   const handleChange = (event) => {
     setForm((current) => ({
@@ -47,6 +48,11 @@ function Login() {
     <main className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
       <section className="w-full max-w-sm rounded-md border border-gray-200 bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-semibold text-gray-900">Admin Login</h1>
+        {sessionExpired && !error ? (
+          <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Your admin session expired because the tab was inactive. Please login again.
+          </p>
+        ) : null}
         <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
           <div>
             <label className="block text-sm font-medium text-gray-700" htmlFor="username">

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import { useAutoLogout } from "../hooks/useAutoLogout";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard" },
@@ -20,6 +21,7 @@ function AdminLayout() {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  useAutoLogout();
 
   const handleLogout = () => {
     logout();
