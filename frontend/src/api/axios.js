@@ -25,7 +25,7 @@ api.interceptors.response.use(
       localStorage.removeItem("adminUser");
 
       if (window.location.pathname !== "/login") {
-        window.location.assign("/login");
+        window.location.replace("/login");
       }
     }
 

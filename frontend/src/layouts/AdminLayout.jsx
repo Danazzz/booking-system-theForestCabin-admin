@@ -64,7 +64,7 @@ function AdminLayout() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-900">
+    <div className="min-h-screen overflow-x-hidden bg-gray-100 text-gray-900">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 md:hidden">
         <div>
           <p className="font-semibold">Forest Cabin</p>
@@ -99,7 +99,7 @@ function AdminLayout() {
       >
         {navContent}
       </aside>
-      <main className="min-h-screen p-4 md:ml-64 md:p-6">
+      <main className="min-h-screen min-w-0 overflow-x-hidden p-3 sm:p-4 md:ml-64 md:p-6">
         <Outlet />
       </main>
     </div>
