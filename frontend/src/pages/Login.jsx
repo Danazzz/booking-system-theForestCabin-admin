@@ -10,7 +10,8 @@ function Login() {
   const [form, setForm] = useState({ username: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const sessionExpired = Boolean(location.state?.sessionExpired);
+  const sessionExpired = Boolean(location.state?.sessionExpired) ||
+    new URLSearchParams(location.search).get("sessionExpired") === "1";
 
   const handleChange = (event) => {
     setForm((current) => ({

@@ -1,32 +1,19 @@
 import { useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getToken, useAuth } from "./useAuth";
+import {
+  clearAdminSession,
+  getAdminToken,
+  getAdminIdleTimeoutMs,
+  isAdminSessionExpired,
+  markAdminSessionActive
+} from "../utils/adminSession";
 
-const LAST_ACTIVE_KEY = "adminLastActiveAt";
-const DEFAULT_TIMEOUT_MINUTES = 10;
 const CHECK_INTERVAL_MS = 30 * 1000;
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll", "focus"];
-
-const getTimeoutMs = () => {
-  const minutes = Number(import.meta.env.VITE_ADMIN_IDLE_TIMEOUT_MINUTES || DEFAULT_TIMEOUT_MINUTES);
-
-  return Math.max(1, minutes) * 60 * 1000;
-};
-
-const getLastActiveAt = () => {
-  const value = Number(localStorage.getItem(LAST_ACTIVE_KEY) || Date.now());
-
-  return Number.isFinite(value) ? value : Date.now();
-};
-
-const markActive = () => {
-  localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
-};
 
 export function useAutoLogout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
   const loggedOutRef = useRef(false);
 
   useEffect(() => {
@@ -34,12 +21,11 @@ export function useAutoLogout() {
       return undefined;
     }
 
-    if (!getToken()) {
+    if (!getAdminToken()) {
       return undefined;
     }
 
     loggedOutRef.current = false;
-    markActive();
 
     const expireSession = () => {
       if (loggedOutRef.current) {
@@ -47,7 +33,7 @@ export function useAutoLogout() {
       }
 
       loggedOutRef.current = true;
-      logout();
+      clearAdminSession();
       navigate("/login", {
         replace: true,
         state: { sessionExpired: true }
@@ -55,33 +41,39 @@ export function useAutoLogout() {
     };
 
     const checkSession = () => {
-      if (!getToken()) {
+      if (!getAdminToken()) {
         return;
       }
 
-      if (Date.now() - getLastActiveAt() >= getTimeoutMs()) {
+      if (isAdminSessionExpired()) {
         expireSession();
       }
     };
 
+    checkSession();
+
+    if (!loggedOutRef.current) {
+      markAdminSessionActive();
+    }
+
     const handleActivity = () => {
-      if (document.hidden || !getToken()) {
+      if (document.hidden || !getAdminToken()) {
         return;
       }
 
-      markActive();
+      markAdminSessionActive();
     };
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        markActive();
+        markAdminSessionActive();
         return;
       }
 
       checkSession();
 
       if (!loggedOutRef.current) {
-        markActive();
+        markAdminSessionActive();
       }
     };
 
@@ -91,6 +83,7 @@ export function useAutoLogout() {
     document.addEventListener("visibilitychange", handleVisibilityChange);
 
     const intervalId = window.setInterval(checkSession, CHECK_INTERVAL_MS);
+    const timeoutId = window.setTimeout(checkSession, getAdminIdleTimeoutMs());
 
     return () => {
       ACTIVITY_EVENTS.forEach((eventName) => {
@@ -98,6 +91,7 @@ export function useAutoLogout() {
       });
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.clearInterval(intervalId);
+      window.clearTimeout(timeoutId);
     };
-  }, [location.pathname, logout, navigate]);
+  }, [location.pathname, navigate]);
 }
