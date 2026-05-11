@@ -35,6 +35,9 @@ input,
 select,
 textarea {
   font: inherit;
+  display: block;
+  inline-size: 100%;
+  min-inline-size: 0;
   max-width: 100%;
 }
 
@@ -45,13 +48,25 @@ textarea {
   min-width: 0;
 }
 
+button {
+  width: auto;
+}
+
+button[type="submit"],
+form button {
+  max-width: 100%;
+}
+
 input[type="file"] {
+  min-inline-size: 0;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .grid > *,
 form > * {
   min-width: 0;
+  max-width: 100%;
 }
 
 img,
@@ -59,4 +74,24 @@ video,
 canvas,
 svg {
   max-width: 100%;
+}
+
+@media (max-width: 767px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  form,
+  form > div,
+  section,
+  article {
+    max-width: 100%;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
 }
