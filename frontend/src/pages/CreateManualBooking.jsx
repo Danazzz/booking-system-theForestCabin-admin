@@ -80,6 +80,79 @@ const applyPromoPricing = (subtotal, promo) => {
   return subtotal;
 };
 
+const isPromoEligible = (promo, { nights, roomType }) => {
+  if (!promo) {
+    return true;
+  }
+
+  const stayNights = Number(nights || 0);
+  const minNights = Number(promo.minNights || 0);
+  const maxNights = Number(promo.maxNights || 0);
+  const eligibleRoomTypes = Array.isArray(promo.eligibleRoomTypes)
+    ? promo.eligibleRoomTypes
+    : [];
+
+  if (minNights > 0 && stayNights < minNights) {
+    return false;
+  }
+
+  if (maxNights > 0 && stayNights > maxNights) {
+    return false;
+  }
+
+  if (eligibleRoomTypes.length > 0 && !eligibleRoomTypes.includes(roomType)) {
+    return false;
+  }
+
+  return true;
+};
+
+const getPromoEligibilityMessage = (promo, { nights, roomType }) => {
+  const stayNights = Number(nights || 0);
+  const minNights = Number(promo?.minNights || 0);
+  const maxNights = Number(promo?.maxNights || 0);
+  const eligibleRoomTypes = Array.isArray(promo?.eligibleRoomTypes)
+    ? promo.eligibleRoomTypes
+    : [];
+
+  if (minNights > 0 && stayNights < minNights) {
+    return `minimum ${minNights} night${minNights > 1 ? "s" : ""}`;
+  }
+
+  if (maxNights > 0 && stayNights > maxNights) {
+    return `maximum ${maxNights} night${maxNights > 1 ? "s" : ""}`;
+  }
+
+  if (eligibleRoomTypes.length > 0 && !eligibleRoomTypes.includes(roomType)) {
+    return `only for ${eligibleRoomTypes.map(formatRoomType).join(", ")}`;
+  }
+
+  return "";
+};
+
+const formatPromoRestrictions = (promo) => {
+  const rules = [];
+  const minNights = Number(promo?.minNights || 0);
+  const maxNights = Number(promo?.maxNights || 0);
+  const eligibleRoomTypes = Array.isArray(promo?.eligibleRoomTypes)
+    ? promo.eligibleRoomTypes
+    : [];
+
+  if (minNights > 0) {
+    rules.push(`min ${minNights} night${minNights > 1 ? "s" : ""}`);
+  }
+
+  if (maxNights > 0) {
+    rules.push(`max ${maxNights} night${maxNights > 1 ? "s" : ""}`);
+  }
+
+  if (eligibleRoomTypes.length > 0) {
+    rules.push(eligibleRoomTypes.map(formatRoomType).join(", "));
+  }
+
+  return rules.join(" · ");
+};
+
 function CreateManualBooking() {
   const navigate = useNavigate();
   const [form, setForm] = useState(emptyForm);
@@ -114,9 +187,14 @@ function CreateManualBooking() {
   const selectedChannel = channels.find((channel) => channel.key === form.source) || null;
   const nights = getNights(form.checkIn, form.checkOut);
   const calculatedSubtotal = nights * Number(selectedRoom?.basePrice || 0);
+  const selectedPromoIsEligible = isPromoEligible(selectedPromo, {
+    nights,
+    roomType: selectedRoom?.roomType
+  });
+  const activeSelectedPromo = selectedPromoIsEligible ? selectedPromo : null;
   const calculatedTotal = Math.max(
     0,
-    Math.round(applyPromoPricing(calculatedSubtotal, selectedPromo))
+    Math.round(applyPromoPricing(calculatedSubtotal, activeSelectedPromo))
   );
   const finalTotal = form.overrideTotal
     ? Number(form.totalAmount || 0)
@@ -214,7 +292,7 @@ function CreateManualBooking() {
         numberOfChildren: Number(form.numberOfChildren || 0),
         totalAmount: Number(finalTotal || 0),
         overrideTotal: Boolean(form.overrideTotal),
-        promoId: form.promoId || undefined,
+        promoId: activeSelectedPromo?._id || undefined,
         source: selectedChannel?.key || form.source,
         sourceName: selectedChannel?.name || form.sourceName
       };
@@ -293,11 +371,27 @@ function CreateManualBooking() {
             <input name="checkOut" type="date" value={form.checkOut} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
             <input name="numberOfGuests" type="number" min="1" value={form.numberOfGuests} onChange={handleChange} required placeholder="Adults" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
             <input name="numberOfChildren" type="number" min="0" value={form.numberOfChildren} onChange={handleChange} placeholder="Children" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-            <select name="promoId" value={form.promoId} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2">
+            <select name="promoId" value={selectedPromo && selectedPromoIsEligible ? form.promoId : ""} onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2">
               <option value="">No promo</option>
-              {promos.map((promo) => (
-                <option key={promo._id} value={promo._id}>{promo.name}</option>
-              ))}
+              {promos.map((promo) => {
+                const eligible = isPromoEligible(promo, {
+                  nights,
+                  roomType: selectedRoom?.roomType
+                });
+                const restriction = formatPromoRestrictions(promo);
+                const reason = getPromoEligibilityMessage(promo, {
+                  nights,
+                  roomType: selectedRoom?.roomType
+                });
+
+                return (
+                  <option key={promo._id} value={promo._id} disabled={!eligible}>
+                    {promo.name}
+                    {restriction ? ` (${restriction})` : ""}
+                    {!eligible && reason ? ` - ${reason}` : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
@@ -324,6 +418,14 @@ function CreateManualBooking() {
             <p><span className="text-gray-500">Calculated:</span> <span className="font-medium">{currencyFormatter.format(calculatedTotal)}</span></p>
             <p><span className="text-gray-500">Final:</span> <span className="font-medium">{currencyFormatter.format(finalTotal || 0)}</span></p>
           </div>
+          {activeSelectedPromo ? (
+            <p className="mt-3 rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">
+              Promo applied: {activeSelectedPromo.name}
+              {formatPromoRestrictions(activeSelectedPromo)
+                ? ` · ${formatPromoRestrictions(activeSelectedPromo)}`
+                : ""}
+            </p>
+          ) : null}
           <textarea name="adminNote" value={form.adminNote} onChange={handleChange} placeholder="Admin note" className="mt-4 min-h-24 w-full rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         </div>
 

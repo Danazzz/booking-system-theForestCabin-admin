@@ -9,6 +9,9 @@ const emptyForm = {
   imageUrl: "",
   adjustmentType: "none",
   adjustmentValue: "",
+  minNights: "",
+  maxNights: "",
+  eligibleRoomTypes: [],
   validFrom: "",
   validUntil: "",
   isActive: true,
@@ -36,6 +39,13 @@ const toDateInput = (value) => (value ? new Date(value).toISOString().slice(0, 1
 const getErrorMessage = (error, fallback) =>
   error.response?.data?.message || error.response?.data?.error || fallback;
 
+const formatRoomType = (roomType) =>
+  String(roomType || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 const buildPayload = (form) => {
   const payload = new FormData();
 
@@ -44,6 +54,9 @@ const buildPayload = (form) => {
   payload.append("imageUrl", form.imageUrl || "");
   payload.append("adjustmentType", form.adjustmentType);
   payload.append("adjustmentValue", form.adjustmentValue || 0);
+  payload.append("minNights", form.minNights || 0);
+  payload.append("maxNights", form.maxNights || 0);
+  payload.append("eligibleRoomTypes", form.eligibleRoomTypes.join(","));
   payload.append("validFrom", form.validFrom || "");
   payload.append("validUntil", form.validUntil || "");
   payload.append("isActive", String(form.isActive));
@@ -77,8 +90,32 @@ const formatRule = (promo) => {
   return "No price change";
 };
 
+const formatPromoRestrictions = (promo) => {
+  const rules = [];
+  const minNights = Number(promo.minNights || 0);
+  const maxNights = Number(promo.maxNights || 0);
+  const eligibleRoomTypes = Array.isArray(promo.eligibleRoomTypes)
+    ? promo.eligibleRoomTypes
+    : [];
+
+  if (minNights > 0) {
+    rules.push(`Min ${minNights} night${minNights > 1 ? "s" : ""}`);
+  }
+
+  if (maxNights > 0) {
+    rules.push(`Max ${maxNights} night${maxNights > 1 ? "s" : ""}`);
+  }
+
+  if (eligibleRoomTypes.length > 0) {
+    rules.push(eligibleRoomTypes.map(formatRoomType).join(", "));
+  }
+
+  return rules.join(" · ") || "All stays and room types";
+};
+
 function Promos() {
   const [promos, setPromos] = useState([]);
+  const [roomTypes, setRoomTypes] = useState([]);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
   const [error, setError] = useState("");
@@ -100,10 +137,17 @@ function Promos() {
 
     const loadInitialPromos = async () => {
       try {
-        const response = await api.get("/admin/promos?includeInactive=true");
+        const [promosResponse, roomTypesResponse] = await Promise.all([
+          api.get("/admin/promos?includeInactive=true"),
+          api.get("/rooms/types")
+        ]);
 
         if (!ignore) {
-          setPromos(response.data.data || []);
+          setPromos(promosResponse.data.data || []);
+          setRoomTypes((roomTypesResponse.data.data || []).map((roomType) => ({
+            value: roomType.roomType,
+            label: roomType.label || formatRoomType(roomType.roomType)
+          })));
         }
       } catch (err) {
         if (!ignore) {
@@ -127,10 +171,23 @@ function Promos() {
   const handleChange = (event) => {
     const { name, value, type, checked, files } = event.target;
 
-    setForm((current) => ({
-      ...current,
-      [name]: type === "checkbox" ? checked : type === "file" ? files?.[0] || null : value
-    }));
+    setForm((current) => {
+      if (name === "eligibleRoomTypes") {
+        const nextRoomTypes = checked
+          ? [...new Set([...current.eligibleRoomTypes, value])]
+          : current.eligibleRoomTypes.filter((roomType) => roomType !== value);
+
+        return {
+          ...current,
+          eligibleRoomTypes: nextRoomTypes
+        };
+      }
+
+      return {
+        ...current,
+        [name]: type === "checkbox" ? checked : type === "file" ? files?.[0] || null : value
+      };
+    });
   };
 
   const handleSubmit = async (event) => {
@@ -167,6 +224,9 @@ function Promos() {
       imageUrl: promo.imageUrl || "",
       adjustmentType: promo.adjustmentType || "none",
       adjustmentValue: promo.adjustmentValue || "",
+      minNights: promo.minNights || "",
+      maxNights: promo.maxNights || "",
+      eligibleRoomTypes: Array.isArray(promo.eligibleRoomTypes) ? promo.eligibleRoomTypes : [],
       validFrom: toDateInput(promo.validFrom),
       validUntil: toDateInput(promo.validUntil),
       isActive: Boolean(promo.isActive),
@@ -213,6 +273,29 @@ function Promos() {
         <input name="adjustmentValue" type="number" min="0" value={form.adjustmentValue} onChange={handleChange} placeholder="Promo value" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Background image URL" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2" />
         <input name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="minNights" type="number" min="0" value={form.minNights} onChange={handleChange} placeholder="Minimum nights" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="maxNights" type="number" min="0" value={form.maxNights} onChange={handleChange} placeholder="Maximum nights" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 md:col-span-2">
+          <p className="text-sm font-medium text-gray-700">Eligible room types</p>
+          <p className="mt-1 text-xs text-gray-500">Leave all unchecked to allow every active room type.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {roomTypes.map((roomType) => (
+              <label key={roomType.value} className="flex min-h-9 items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1 text-sm text-gray-700">
+                <input
+                  name="eligibleRoomTypes"
+                  type="checkbox"
+                  value={roomType.value}
+                  checked={form.eligibleRoomTypes.includes(roomType.value)}
+                  onChange={handleChange}
+                />
+                {roomType.label}
+              </label>
+            ))}
+            {!roomTypes.length ? (
+              <span className="text-sm text-gray-500">No active room types found.</span>
+            ) : null}
+          </div>
+        </div>
         <textarea name="description" value={form.description} onChange={handleChange} placeholder="Promo description" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-4" />
         <label className="flex items-center gap-2 text-sm text-gray-700">
           <input name="isActive" type="checkbox" checked={form.isActive} onChange={handleChange} />
@@ -234,7 +317,7 @@ function Promos() {
       {message ? <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{message}</p> : null}
 
       <div className="overflow-x-auto rounded-md border border-gray-200 bg-white shadow-sm">
-        <table className="min-w-[1040px] divide-y divide-gray-200 text-sm">
+        <table className="min-w-[1120px] divide-y divide-gray-200 text-sm">
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-4 py-3">Image</th>
@@ -242,6 +325,7 @@ function Promos() {
               <SortHeader label="Valid from" sortKey="validFrom" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Valid until" sortKey="validUntil" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Price rule" sortKey="adjustment" sortConfig={sortConfig} onSort={requestSort} />
+              <th className="px-4 py-3">Eligibility</th>
               <SortHeader label="Status" sortKey="status" sortConfig={sortConfig} onSort={requestSort} />
               <th className="px-4 py-3">Actions</th>
             </tr>
@@ -263,6 +347,7 @@ function Promos() {
                 <td className="px-4 py-3">{toDateInput(promo.validFrom) || "-"}</td>
                 <td className="px-4 py-3">{toDateInput(promo.validUntil) || "-"}</td>
                 <td className="px-4 py-3">{adjustmentLabels[promo.adjustmentType || "none"]} · {formatRule(promo)}</td>
+                <td className="px-4 py-3">{formatPromoRestrictions(promo)}</td>
                 <td className="px-4 py-3">{promo.isActive ? "Active" : "Inactive"}</td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
@@ -276,7 +361,7 @@ function Promos() {
             ))}
             {!promos.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="7">No promos found.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="8">No promos found.</td>
               </tr>
             ) : null}
           </tbody>
