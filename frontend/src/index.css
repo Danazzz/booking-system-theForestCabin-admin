@@ -77,6 +77,18 @@ svg {
 }
 
 @media (max-width: 767px) {
+  main,
+  section,
+  form,
+  article,
+  form > div,
+  section > div,
+  article > div {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+  }
+
   .grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -93,5 +105,36 @@ svg {
   textarea,
   button {
     font-size: 16px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    min-inline-size: 0;
+    appearance: none;
+  }
+
+  input[type="date"],
+  input[type="number"],
+  input[type="text"],
+  input[type="email"],
+  input[type="url"],
+  input[type="file"],
+  select,
+  textarea {
+    display: block;
+    max-width: 100%;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    inline-size: auto;
+    width: auto;
+  }
+
+  .overflow-x-auto {
+    max-inline-size: 100%;
   }
 }

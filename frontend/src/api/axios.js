@@ -6,7 +6,9 @@ import {
   markAdminSessionActive
 } from "../utils/adminSession";
 
-const API_ROOT = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_ROOT = String(import.meta.env.VITE_API_URL || "http://localhost:5001")
+  .trim()
+  .replace(/\/+$/, "");
 const API_BASE_URL = API_ROOT.endsWith("/api") ? API_ROOT : `${API_ROOT}/api`;
 
 const api = axios.create({
