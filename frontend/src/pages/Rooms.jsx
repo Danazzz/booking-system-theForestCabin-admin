@@ -12,7 +12,7 @@ const emptyForm = {
   basePrice: "",
   description: "",
   imageUrl: "",
-  image: null,
+  images: [],
   altText: "",
   details: "",
   status: "active"
@@ -40,6 +40,14 @@ function Rooms() {
     sortConfig,
     requestSort
   } = useSortableData(rooms, roomSortAccessors, { key: "roomNumber", direction: "asc" });
+  const editingRoom = rooms.find((room) => room._id === editingId);
+  const editingRoomImages = editingRoom
+    ? (editingRoom.images?.length
+      ? editingRoom.images
+      : editingRoom.imageUrl
+        ? [{ _id: "legacy-cover", url: editingRoom.imageUrl, altText: editingRoom.altText }]
+        : [])
+    : [];
 
   const loadRooms = async () => {
     const response = await api.get("/rooms");
@@ -85,14 +93,17 @@ function Rooms() {
     payload.append("childCapacity", Number(form.childCapacity || 0));
     payload.append("basePrice", Number(form.basePrice || 0));
     payload.append("description", form.description || "");
-    payload.append("imageUrl", form.imageUrl || "");
     payload.append("altText", form.altText || "");
     payload.append("details", form.details || "");
     payload.append("status", form.status);
 
-    if (form.image) {
-      payload.append("image", form.image);
+    if (!editingId || form.imageUrl !== (editingRoom?.imageUrl || "")) {
+      payload.append("imageUrl", form.imageUrl || "");
     }
+
+    form.images.forEach((image) => {
+      payload.append("images", image);
+    });
 
     return payload;
   };
@@ -102,7 +113,7 @@ function Rooms() {
 
     setForm((current) => ({
       ...current,
-      [name]: type === "file" ? files?.[0] || null : value
+      [name]: type === "file" ? Array.from(files || []) : value
     }));
   };
 
@@ -143,11 +154,28 @@ function Rooms() {
       basePrice: room.basePrice || "",
       description: room.description || "",
       imageUrl: room.imageUrl || "",
-      image: null,
+      images: [],
       altText: room.altText || "",
       details: (room.details || []).join("\n"),
       status: room.status || "active"
     });
+  };
+
+  const deleteRoomImage = async (roomId, imageId) => {
+    if (!window.confirm("Delete this room photo?")) {
+      return;
+    }
+
+    setError("");
+    setMessage("");
+
+    try {
+      await api.delete(`/rooms/${roomId}/images/${imageId}`);
+      setMessage("Room photo deleted");
+      await loadRooms();
+    } catch (err) {
+      setError(err.response?.data?.message || "Failed to delete room photo");
+    }
   };
 
   const deleteRoom = async (roomId) => {
@@ -181,8 +209,8 @@ function Rooms() {
         <input name="capacity" type="number" min="1" value={form.capacity} onChange={handleChange} required placeholder="Adult capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="childCapacity" type="number" min="0" value={form.childCapacity} onChange={handleChange} placeholder="Child capacity" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="basePrice" type="number" min="0" value={form.basePrice} onChange={handleChange} placeholder="Base price" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Accommodation image URL" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2" />
-        <input name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <input name="imageUrl" value={form.imageUrl} onChange={handleChange} placeholder="Optional image URL" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-2" />
+        <input name="images" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="altText" value={form.altText} onChange={handleChange} placeholder="Image alt text" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <textarea name="description" value={form.description} onChange={handleChange} placeholder="Accommodation description shown on user frontend" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-3" />
         <textarea name="details" value={form.details} onChange={handleChange} placeholder="Accommodation details, one per line" className="min-h-24 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900 md:col-span-3" />
@@ -191,6 +219,23 @@ function Rooms() {
           <option value="maintenance">Maintenance</option>
           <option value="inactive">Inactive</option>
         </select>
+        {editingRoomImages.length ? (
+          <div className="grid gap-3 rounded-md bg-gray-50 p-3 md:col-span-3 sm:grid-cols-2 lg:grid-cols-4">
+            {editingRoomImages.map((image) => (
+              <div key={image._id || image.url} className="min-w-0 rounded-md border border-gray-200 bg-white p-2">
+                <img src={image.url} alt={image.altText || editingRoom?.name || "Room photo"} className="h-28 w-full rounded object-cover" />
+                <button
+                  type="button"
+                  onClick={() => deleteRoomImage(editingId, image._id)}
+                  disabled={!image._id || image._id === "legacy-cover"}
+                  className="mt-2 min-h-9 w-full rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 disabled:border-gray-200 disabled:text-gray-400"
+                >
+                  {image._id === "legacy-cover" ? "Legacy cover" : "Delete photo"}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="flex flex-col gap-2 sm:flex-row md:col-span-3">
           <button type="submit" disabled={loading} className="min-h-11 rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white disabled:bg-gray-400">
             {editingId ? "Update room" : "Create room"}
@@ -211,6 +256,7 @@ function Rooms() {
           <thead className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
             <tr>
               <th className="px-4 py-3">Image</th>
+              <th className="px-4 py-3">Photos</th>
               <SortHeader label="Room number" sortKey="roomNumber" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Room type" sortKey="roomType" sortConfig={sortConfig} onSort={requestSort} />
               <SortHeader label="Name" sortKey="name" sortConfig={sortConfig} onSort={requestSort} />
@@ -225,12 +271,13 @@ function Rooms() {
             {sortedItems.map((room) => (
               <tr key={room._id}>
                 <td className="px-4 py-3">
-                  {room.imageUrl ? (
-                    <img src={room.imageUrl} alt={room.altText || room.name} className="h-14 w-20 rounded object-cover" />
+                  {(room.images?.[0]?.url || room.imageUrl) ? (
+                    <img src={room.images?.[0]?.url || room.imageUrl} alt={room.images?.[0]?.altText || room.altText || room.name} className="h-14 w-20 rounded object-cover" />
                   ) : (
                     <div className="flex h-14 w-20 items-center justify-center rounded bg-gray-100 text-xs text-gray-400">No image</div>
                   )}
                 </td>
+                <td className="px-4 py-3">{room.images?.length || (room.imageUrl ? 1 : 0)}</td>
                 <td className="px-4 py-3 font-medium text-gray-900">{room.roomNumber}</td>
                 <td className="px-4 py-3 capitalize">{room.roomType}</td>
                 <td className="px-4 py-3">
@@ -251,7 +298,7 @@ function Rooms() {
             ))}
             {!rooms.length ? (
               <tr>
-                <td className="px-4 py-6 text-center text-gray-500" colSpan="9">No rooms found. Add your first room above.</td>
+                <td className="px-4 py-6 text-center text-gray-500" colSpan="10">No rooms found. Add your first room above.</td>
               </tr>
             ) : null}
           </tbody>
