@@ -6,6 +6,7 @@ const createRoomItem = (overrides = {}) => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
   roomType: "",
   roomId: "",
+  assignedRoomIds: [],
   roomCount: 1,
   adultGuests: 2,
   childGuests: 0,
@@ -255,24 +256,38 @@ function CreateManualBooking() {
         const profile = roomTypeProfiles.get(item.roomType) || null;
         const roomsForType = profile?.rooms || [];
         const roomCount = Math.max(1, Number(item.roomCount || 1));
-        const selectedRoom = roomsForType.find((room) => room._id === item.roomId) || null;
+        const assignedRoomIds = Array.isArray(item.assignedRoomIds)
+          ? item.assignedRoomIds.filter(Boolean)
+          : [];
+        const selectedRooms = roomsForType.filter((room) => assignedRoomIds.includes(room._id));
+        const roomId = roomCount === 1
+          ? item.roomId || assignedRoomIds[0] || ""
+          : "";
+        const selectedRoom = roomsForType.find((room) => room._id === roomId) || null;
         const adultGuests = Math.max(0, Number(item.adultGuests || 0));
         const childGuests = Math.max(0, Number(item.childGuests || 0));
-        const adultCapacity = sumTopValues(
-          roomsForType.map((room) => room.capacity),
-          roomCount
-        );
-        const childCapacity = sumTopValues(
-          roomsForType.map((room) => room.childCapacity),
-          roomCount
-        );
+        const adultCapacity = selectedRooms.length
+          ? selectedRooms.reduce((total, room) => total + Number(room.capacity || 0), 0)
+          : sumTopValues(
+              roomsForType.map((room) => room.capacity),
+              roomCount
+            );
+        const childCapacity = selectedRooms.length
+          ? selectedRooms.reduce((total, room) => total + Number(room.childCapacity || 0), 0)
+          : sumTopValues(
+              roomsForType.map((room) => room.childCapacity),
+              roomCount
+            );
         const basePrice = Number(profile?.basePrice || selectedRoom?.basePrice || 0);
 
         return {
           ...item,
           profile,
           roomsForType,
+          roomId,
           selectedRoom,
+          selectedRooms,
+          assignedRoomIds,
           roomCount,
           adultGuests,
           childGuests,
@@ -330,7 +345,8 @@ function CreateManualBooking() {
           setRoomItems([
             createRoomItem({
               roomType: firstRoom?.roomType || "",
-              roomId: firstRoom?._id || ""
+              roomId: firstRoom?._id || "",
+              assignedRoomIds: firstRoom?._id ? [firstRoom._id] : []
             })
           ]);
           setForm((current) => ({
@@ -400,10 +416,23 @@ function CreateManualBooking() {
         if (field === "roomType") {
           const firstRoom = rooms.find((room) => room.roomType === value);
           next.roomId = firstRoom?._id || "";
+          next.assignedRoomIds = firstRoom?._id ? [firstRoom._id] : [];
         }
 
-        if (field === "roomCount" && Number(value) > 1) {
-          next.roomId = "";
+        if (field === "roomId") {
+          next.assignedRoomIds = value ? [value] : [];
+        }
+
+        if (field === "roomCount") {
+          const nextCount = Math.max(1, Number(value || 1));
+
+          if (nextCount === 1) {
+            next.roomId = next.roomId || next.assignedRoomIds[0] || "";
+            next.assignedRoomIds = next.roomId ? [next.roomId] : [];
+          } else {
+            next.roomId = "";
+            next.assignedRoomIds = next.assignedRoomIds.slice(0, nextCount);
+          }
         }
 
         return next;
@@ -419,6 +448,7 @@ function CreateManualBooking() {
       createRoomItem({
         roomType: firstRoom?.roomType || "",
         roomId: firstRoom?._id || "",
+        assignedRoomIds: firstRoom?._id ? [firstRoom._id] : [],
         adultGuests: 1
       })
     ]);
@@ -429,6 +459,33 @@ function CreateManualBooking() {
       currentItems.length === 1
         ? currentItems
         : currentItems.filter((item) => item.id !== itemId)
+    );
+  };
+
+  const toggleAssignedRoom = (itemId, roomId) => {
+    setRoomItems((currentItems) =>
+      currentItems.map((item) => {
+        if (item.id !== itemId) {
+          return item;
+        }
+
+        const selected = Array.isArray(item.assignedRoomIds)
+          ? item.assignedRoomIds
+          : [];
+        const selectedSet = new Set(selected);
+
+        if (selectedSet.has(roomId)) {
+          selectedSet.delete(roomId);
+        } else if (selectedSet.size < Number(item.roomCount || 1)) {
+          selectedSet.add(roomId);
+        }
+
+        return {
+          ...item,
+          roomId: "",
+          assignedRoomIds: Array.from(selectedSet)
+        };
+      })
     );
   };
 
@@ -454,12 +511,16 @@ function CreateManualBooking() {
         return `${formatRoomType(item.roomType)} only has ${item.roomsForType.length} active room unit(s).`;
       }
 
+      if (item.assignedRoomIds.length > 0 && item.assignedRoomIds.length !== item.roomCount) {
+        return `Select exactly ${item.roomCount} room(s) for ${formatRoomType(item.roomType)}, or clear all selections for auto assignment.`;
+      }
+
       if (item.adultGuests > item.adultCapacity) {
-        return `${formatRoomType(item.roomType)} can host up to ${item.adultCapacity} adult guests for ${item.roomCount} room(s).`;
+        return `${formatRoomType(item.roomType)} can host up to ${item.adultCapacity} adult guests for the selected room(s).`;
       }
 
       if (item.childGuests > item.childCapacity) {
-        return `${formatRoomType(item.roomType)} can host up to ${item.childCapacity} children for ${item.roomCount} room(s).`;
+        return `${formatRoomType(item.roomType)} can host up to ${item.childCapacity} children for the selected room(s).`;
       }
     }
 
@@ -486,7 +547,13 @@ function CreateManualBooking() {
         roomCount: item.roomCount,
         adultGuests: item.adultGuests,
         childGuests: item.childGuests,
-        assignedRoomIds: item.roomId && item.roomCount === 1 ? [item.roomId] : undefined
+        assignedRoomIds: (() => {
+          const assignedRoomIds = item.roomCount === 1
+            ? item.roomId ? [item.roomId] : item.assignedRoomIds
+            : item.assignedRoomIds;
+
+          return assignedRoomIds.length ? assignedRoomIds : undefined;
+        })()
       }));
       const firstSingleRoomItem = pricedRoomItems.length === 1 && pricedRoomItems[0].roomCount === 1
         ? pricedRoomItems[0]
@@ -661,6 +728,35 @@ function CreateManualBooking() {
                     {item.roomCount}x {formatRoomType(item.roomType)} · capacity {item.adultCapacity} adults / {item.childCapacity} children · {currencyFormatter.format(item.subtotal || 0)}
                   </div>
                 </div>
+                {item.roomCount > 1 ? (
+                  <div className="mt-3 rounded-md border border-gray-200 bg-white p-3">
+                    <div className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between">
+                      <p className="font-medium text-gray-800">Specific rooms</p>
+                      <p className="text-gray-500">{item.assignedRoomIds.length}/{item.roomCount} selected</p>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {item.roomsForType.map((room) => {
+                        const checked = item.assignedRoomIds.includes(room._id);
+                        const disabled = !checked && item.assignedRoomIds.length >= item.roomCount;
+
+                        return (
+                          <label key={room._id} className="flex min-h-10 items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              disabled={disabled}
+                              onChange={() => toggleAssignedRoom(item.id, room._id)}
+                            />
+                            <span>{room.roomNumber} · {room.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      Leave all unchecked to let the system auto-assign available rooms.
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>
