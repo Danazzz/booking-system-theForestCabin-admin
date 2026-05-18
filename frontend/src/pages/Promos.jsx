@@ -11,6 +11,7 @@ const emptyForm = {
   adjustmentValue: "",
   minNights: "",
   maxNights: "",
+  minRooms: "",
   eligibleRoomTypes: [],
   validFrom: "",
   validUntil: "",
@@ -56,6 +57,7 @@ const buildPayload = (form) => {
   payload.append("adjustmentValue", form.adjustmentValue || 0);
   payload.append("minNights", form.minNights || 0);
   payload.append("maxNights", form.maxNights || 0);
+  payload.append("minRooms", form.minRooms || 0);
   payload.append("eligibleRoomTypes", form.eligibleRoomTypes.join(","));
   payload.append("validFrom", form.validFrom || "");
   payload.append("validUntil", form.validUntil || "");
@@ -94,6 +96,7 @@ const formatPromoRestrictions = (promo) => {
   const rules = [];
   const minNights = Number(promo.minNights || 0);
   const maxNights = Number(promo.maxNights || 0);
+  const minRooms = Number(promo.minRooms || 0);
   const eligibleRoomTypes = Array.isArray(promo.eligibleRoomTypes)
     ? promo.eligibleRoomTypes
     : [];
@@ -104,6 +107,10 @@ const formatPromoRestrictions = (promo) => {
 
   if (maxNights > 0) {
     rules.push(`Max ${maxNights} night${maxNights > 1 ? "s" : ""}`);
+  }
+
+  if (minRooms > 0) {
+    rules.push(`Min ${minRooms} room${minRooms > 1 ? "s" : ""}`);
   }
 
   if (eligibleRoomTypes.length > 0) {
@@ -226,6 +233,7 @@ function Promos() {
       adjustmentValue: promo.adjustmentValue || "",
       minNights: promo.minNights || "",
       maxNights: promo.maxNights || "",
+      minRooms: promo.minRooms || "",
       eligibleRoomTypes: Array.isArray(promo.eligibleRoomTypes) ? promo.eligibleRoomTypes : [],
       validFrom: toDateInput(promo.validFrom),
       validUntil: toDateInput(promo.validUntil),
@@ -275,7 +283,8 @@ function Promos() {
         <input name="image" type="file" accept="image/jpeg,image/png,image/webp" onChange={handleChange} className="min-h-11 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="minNights" type="number" min="0" value={form.minNights} onChange={handleChange} placeholder="Minimum nights" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
         <input name="maxNights" type="number" min="0" value={form.maxNights} onChange={handleChange} placeholder="Maximum nights" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
-        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 md:col-span-2">
+        <input name="minRooms" type="number" min="0" value={form.minRooms} onChange={handleChange} placeholder="Minimum rooms" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 md:col-span-1">
           <p className="text-sm font-medium text-gray-700">Eligible room types</p>
           <p className="mt-1 text-xs text-gray-500">Leave all unchecked to allow every active room type.</p>
           <div className="mt-3 flex flex-wrap gap-2">

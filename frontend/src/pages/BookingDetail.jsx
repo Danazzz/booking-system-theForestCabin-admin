@@ -16,6 +16,31 @@ const formatSource = (source) =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ") || "-";
+const formatRoomType = (roomType) =>
+  String(roomType || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+const getBookingRoomSummary = (booking) => {
+  const assignedRooms = (booking?.roomItems || [])
+    .flatMap((item) => item.assignedRooms || [])
+    .filter((room) => room.roomId);
+
+  if (assignedRooms.length) {
+    return assignedRooms
+      .map((room) => `${room.roomNumber} ${room.name || formatRoomType(room.roomType)}`.trim())
+      .join(", ");
+  }
+
+  if (booking?.roomItems?.length) {
+    return booking.roomItems
+      .map((item) => `${item.roomCount || 1}x ${formatRoomType(item.roomType)}`)
+      .join(", ");
+  }
+
+  return `${booking?.roomId?.roomNumber || ""} ${booking?.roomId?.name || formatRoomType(booking?.roomType)}`.trim();
+};
 const isSmtpLimitWarning = (value) =>
   String(value || "").includes("SMTP_DAILY_LIMIT_REACHED");
 
@@ -321,11 +346,12 @@ function BookingDetail() {
                 <div><dt className="text-gray-500">Guest</dt><dd className="font-medium">{booking.guestName}</dd></div>
                 <div><dt className="text-gray-500">Email</dt><dd className="font-medium">{booking.guestEmail}</dd></div>
                 <div><dt className="text-gray-500">Phone</dt><dd className="font-medium">{booking.guestPhone}</dd></div>
-                <div><dt className="text-gray-500">Room</dt><dd className="font-medium">{booking.roomId?.roomNumber} {booking.roomId?.name || booking.roomType}</dd></div>
+                <div><dt className="text-gray-500">Room</dt><dd className="font-medium">{getBookingRoomSummary(booking)}</dd></div>
                 <div><dt className="text-gray-500">Check in</dt><dd className="font-medium">{formatDate(booking.checkIn)}</dd></div>
                 <div><dt className="text-gray-500">Check out</dt><dd className="font-medium">{formatDate(booking.checkOut)}</dd></div>
                 <div><dt className="text-gray-500">Adults</dt><dd className="font-medium">{booking.numberOfGuests}</dd></div>
                 <div><dt className="text-gray-500">Children</dt><dd className="font-medium">{booking.numberOfChildren || 0}</dd></div>
+                <div><dt className="text-gray-500">Room count</dt><dd className="font-medium">{booking.numberOfRooms || 1}</dd></div>
                 <div><dt className="text-gray-500">Total</dt><dd className="font-medium">{currencyFormatter.format(booking.totalAmount || 0)}</dd></div>
                 {booking.promoName ? <div><dt className="text-gray-500">Promo</dt><dd className="font-medium">{booking.promoName}</dd></div> : null}
                 <div><dt className="text-gray-500">Source</dt><dd className="font-medium">{booking.sourceName || formatSource(booking.source)}</dd></div>
@@ -337,6 +363,27 @@ function BookingDetail() {
                 {booking.cancelledAt ? <div><dt className="text-gray-500">Cancelled at</dt><dd className="font-medium">{formatDate(booking.cancelledAt)}</dd></div> : null}
                 {booking.adminNote ? <div><dt className="text-gray-500">Admin note</dt><dd className="font-medium">{booking.adminNote}</dd></div> : null}
               </dl>
+              {booking.roomItems?.length ? (
+                <div className="mt-4 rounded-md border border-gray-200 bg-gray-50 p-3 text-sm">
+                  <p className="font-semibold text-gray-900">Room breakdown</p>
+                  <div className="mt-2 space-y-2">
+                    {booking.roomItems.map((item, index) => (
+                      <div key={`${item.roomType}-${index}`} className="rounded-md bg-white p-3">
+                        <p className="font-medium">
+                          {item.roomCount || 1}x {formatRoomType(item.roomType)} · {item.adultGuests || 0} adults · {item.childGuests || 0} children
+                        </p>
+                        {item.assignedRooms?.length ? (
+                          <p className="mt-1 text-gray-600">
+                            Rooms: {item.assignedRooms.map((room) => room.roomNumber).join(", ")}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-amber-700">Rooms will be assigned when availability is approved.</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm">

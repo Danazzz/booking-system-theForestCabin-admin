@@ -8,6 +8,7 @@ const emptyForm = {
   guestPhone: "",
   roomType: "",
   roomId: "",
+  roomCount: 1,
   checkIn: "",
   checkOut: "",
   numberOfGuests: 2,
@@ -80,7 +81,7 @@ const applyPromoPricing = (subtotal, promo) => {
   return subtotal;
 };
 
-const isPromoEligible = (promo, { nights, roomType }) => {
+const isPromoEligible = (promo, { nights, roomType, totalRooms = 1 }) => {
   if (!promo) {
     return true;
   }
@@ -88,6 +89,7 @@ const isPromoEligible = (promo, { nights, roomType }) => {
   const stayNights = Number(nights || 0);
   const minNights = Number(promo.minNights || 0);
   const maxNights = Number(promo.maxNights || 0);
+  const minRooms = Number(promo.minRooms || 0);
   const eligibleRoomTypes = Array.isArray(promo.eligibleRoomTypes)
     ? promo.eligibleRoomTypes
     : [];
@@ -100,6 +102,10 @@ const isPromoEligible = (promo, { nights, roomType }) => {
     return false;
   }
 
+  if (minRooms > 0 && Number(totalRooms || 0) < minRooms) {
+    return false;
+  }
+
   if (eligibleRoomTypes.length > 0 && !eligibleRoomTypes.includes(roomType)) {
     return false;
   }
@@ -107,10 +113,11 @@ const isPromoEligible = (promo, { nights, roomType }) => {
   return true;
 };
 
-const getPromoEligibilityMessage = (promo, { nights, roomType }) => {
+const getPromoEligibilityMessage = (promo, { nights, roomType, totalRooms = 1 }) => {
   const stayNights = Number(nights || 0);
   const minNights = Number(promo?.minNights || 0);
   const maxNights = Number(promo?.maxNights || 0);
+  const minRooms = Number(promo?.minRooms || 0);
   const eligibleRoomTypes = Array.isArray(promo?.eligibleRoomTypes)
     ? promo.eligibleRoomTypes
     : [];
@@ -121,6 +128,10 @@ const getPromoEligibilityMessage = (promo, { nights, roomType }) => {
 
   if (maxNights > 0 && stayNights > maxNights) {
     return `maximum ${maxNights} night${maxNights > 1 ? "s" : ""}`;
+  }
+
+  if (minRooms > 0 && Number(totalRooms || 0) < minRooms) {
+    return `minimum ${minRooms} room${minRooms > 1 ? "s" : ""}`;
   }
 
   if (eligibleRoomTypes.length > 0 && !eligibleRoomTypes.includes(roomType)) {
@@ -134,6 +145,7 @@ const formatPromoRestrictions = (promo) => {
   const rules = [];
   const minNights = Number(promo?.minNights || 0);
   const maxNights = Number(promo?.maxNights || 0);
+  const minRooms = Number(promo?.minRooms || 0);
   const eligibleRoomTypes = Array.isArray(promo?.eligibleRoomTypes)
     ? promo.eligibleRoomTypes
     : [];
@@ -144,6 +156,10 @@ const formatPromoRestrictions = (promo) => {
 
   if (maxNights > 0) {
     rules.push(`max ${maxNights} night${maxNights > 1 ? "s" : ""}`);
+  }
+
+  if (minRooms > 0) {
+    rules.push(`min ${minRooms} room${minRooms > 1 ? "s" : ""}`);
   }
 
   if (eligibleRoomTypes.length > 0) {
@@ -186,10 +202,12 @@ function CreateManualBooking() {
   const selectedPromo = promos.find((promo) => promo._id === form.promoId) || null;
   const selectedChannel = channels.find((channel) => channel.key === form.source) || null;
   const nights = getNights(form.checkIn, form.checkOut);
-  const calculatedSubtotal = nights * Number(selectedRoom?.basePrice || 0);
+  const roomCount = Math.max(1, Number(form.roomCount || 1));
+  const calculatedSubtotal = nights * Number(selectedRoom?.basePrice || 0) * roomCount;
   const selectedPromoIsEligible = isPromoEligible(selectedPromo, {
     nights,
-    roomType: selectedRoom?.roomType
+    roomType: selectedRoom?.roomType,
+    totalRooms: roomCount
   });
   const activeSelectedPromo = selectedPromoIsEligible ? selectedPromo : null;
   const calculatedTotal = Math.max(
@@ -260,6 +278,10 @@ function CreateManualBooking() {
         next.roomId = firstRoom?._id || "";
       }
 
+      if (name === "roomCount" && Number(value) > 1) {
+        next.roomId = "";
+      }
+
       if (name === "bookingStatus" && value === "success") {
         next.paymentStatus = "paid";
       }
@@ -287,9 +309,19 @@ function CreateManualBooking() {
       const payload = {
         ...form,
         roomType: selectedRoom?.roomType || form.roomType,
-        roomId: form.roomId || selectedRoom?._id,
+        roomId: roomCount === 1 ? form.roomId || selectedRoom?._id : undefined,
+        roomCount,
+        roomItems: [
+          {
+            roomType: selectedRoom?.roomType || form.roomType,
+            roomCount,
+            adultGuests: Number(form.numberOfGuests),
+            childGuests: Number(form.numberOfChildren || 0)
+          }
+        ],
         numberOfGuests: Number(form.numberOfGuests),
         numberOfChildren: Number(form.numberOfChildren || 0),
+        numberOfRooms: roomCount,
         totalAmount: Number(finalTotal || 0),
         overrideTotal: Boolean(form.overrideTotal),
         promoId: activeSelectedPromo?._id || undefined,
@@ -360,13 +392,15 @@ function CreateManualBooking() {
                 <option key={roomType.roomType} value={roomType.roomType}>{roomType.label}</option>
               ))}
             </select>
-            <select name="roomId" value={form.roomId} onChange={handleChange} disabled={loading || filteredRooms.length === 0} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+            <select name="roomId" value={form.roomId} onChange={handleChange} disabled={loading || filteredRooms.length === 0 || roomCount > 1} className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900">
+              {roomCount > 1 ? <option value="">Auto assign {roomCount} rooms</option> : null}
               {filteredRooms.map((room) => (
                 <option key={room._id} value={room._id}>
                   {room.roomNumber} · {room.name}
                 </option>
               ))}
             </select>
+            <input name="roomCount" type="number" min="1" value={form.roomCount} onChange={handleChange} required placeholder="Rooms" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
             <input name="checkIn" type="date" value={form.checkIn} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
             <input name="checkOut" type="date" value={form.checkOut} onChange={handleChange} required className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
             <input name="numberOfGuests" type="number" min="1" value={form.numberOfGuests} onChange={handleChange} required placeholder="Adults" className="min-h-11 rounded-md border border-gray-300 px-3 py-2 text-sm outline-none focus:border-gray-900" />
@@ -376,12 +410,14 @@ function CreateManualBooking() {
               {promos.map((promo) => {
                 const eligible = isPromoEligible(promo, {
                   nights,
-                  roomType: selectedRoom?.roomType
+                  roomType: selectedRoom?.roomType,
+                  totalRooms: roomCount
                 });
                 const restriction = formatPromoRestrictions(promo);
                 const reason = getPromoEligibilityMessage(promo, {
                   nights,
-                  roomType: selectedRoom?.roomType
+                  roomType: selectedRoom?.roomType,
+                  totalRooms: roomCount
                 });
 
                 return (
@@ -414,6 +450,7 @@ function CreateManualBooking() {
           </div>
           <div className="mt-4 grid gap-3 rounded-md bg-gray-50 p-4 text-sm md:grid-cols-4">
             <p><span className="text-gray-500">Nights:</span> <span className="font-medium">{nights}</span></p>
+            <p><span className="text-gray-500">Rooms:</span> <span className="font-medium">{roomCount}</span></p>
             <p><span className="text-gray-500">Base price:</span> <span className="font-medium">{currencyFormatter.format(selectedRoom?.basePrice || 0)}</span></p>
             <p><span className="text-gray-500">Calculated:</span> <span className="font-medium">{currencyFormatter.format(calculatedTotal)}</span></p>
             <p><span className="text-gray-500">Final:</span> <span className="font-medium">{currencyFormatter.format(finalTotal || 0)}</span></p>

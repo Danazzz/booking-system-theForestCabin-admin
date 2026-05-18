@@ -4,6 +4,29 @@ import api from "../api/axios";
 
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
 const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : "-");
+const formatRoomType = (roomType) =>
+  String(roomType || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+const getBookingRoomSummary = (booking) => {
+  const assignedRooms = (booking.roomItems || [])
+    .flatMap((item) => item.assignedRooms || [])
+    .filter((room) => room.roomId);
+
+  if (assignedRooms.length) {
+    return assignedRooms.map((room) => room.roomNumber).join(", ");
+  }
+
+  if (booking.roomItems?.length) {
+    return booking.roomItems
+      .map((item) => `${item.roomCount || 1}x ${formatRoomType(item.roomType)}`)
+      .join(", ");
+  }
+
+  return `${booking.roomId?.roomNumber || "Room not assigned"} ${booking.roomId?.name || formatRoomType(booking.roomType)}`.trim();
+};
 const statusLabels = {
   waiting_availability_approval: "Waiting availability approval",
   pending_payment: "Pending payment",
@@ -126,7 +149,7 @@ function WaitingApproval() {
                   <div>
                     <h2 className="font-semibold">{booking.bookingCode} · {booking.guestName}</h2>
                     <p className="text-sm text-gray-500">
-                      {booking.roomId?.roomNumber || "Room not assigned"} {booking.roomId?.name || booking.roomType} · {formatDate(booking.checkIn)} to {formatDate(booking.checkOut)}
+                      {getBookingRoomSummary(booking)} · {formatDate(booking.checkIn)} to {formatDate(booking.checkOut)}
                     </p>
                   </div>
                   <Link to={`/bookings/${booking._id}`} className="text-sm font-semibold text-gray-900 underline">

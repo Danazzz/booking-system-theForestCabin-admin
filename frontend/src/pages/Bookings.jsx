@@ -19,17 +19,6 @@ const statusStyles = {
   cancelled: "bg-gray-100 text-gray-600"
 };
 
-const sortAccessors = {
-  code: (booking) => booking.bookingCode || "",
-  guest: (booking) => booking.guestName || "",
-  room: (booking) => booking.roomId?.roomNumber || "",
-  checkIn: (booking) => booking.checkIn || "",
-  checkOut: (booking) => booking.checkOut || "",
-  status: (booking) => booking.bookingStatus || "",
-  source: (booking) => booking.sourceName || booking.source || "",
-  total: (booking) => booking.totalAmount || 0
-};
-
 const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : "-");
 const humanizeSource = (source) =>
   String(source || "")
@@ -37,6 +26,35 @@ const humanizeSource = (source) =>
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ") || "-";
+const formatRoomType = (roomType) => humanizeSource(roomType);
+const getBookingRoomSummary = (booking) => {
+  const assignedRooms = (booking.roomItems || [])
+    .flatMap((item) => item.assignedRooms || [])
+    .filter((room) => room.roomId);
+
+  if (assignedRooms.length) {
+    return assignedRooms.map((room) => room.roomNumber).join(", ");
+  }
+
+  if (booking.roomItems?.length) {
+    return booking.roomItems
+      .map((item) => `${item.roomCount || 1}x ${formatRoomType(item.roomType)}`)
+      .join(", ");
+  }
+
+  return `${booking.roomId?.roomNumber || "-"} ${booking.roomId?.name || formatRoomType(booking.roomType)}`.trim();
+};
+
+const sortAccessors = {
+  code: (booking) => booking.bookingCode || "",
+  guest: (booking) => booking.guestName || "",
+  room: (booking) => getBookingRoomSummary(booking),
+  checkIn: (booking) => booking.checkIn || "",
+  checkOut: (booking) => booking.checkOut || "",
+  status: (booking) => booking.bookingStatus || "",
+  source: (booking) => booking.sourceName || booking.source || "",
+  total: (booking) => booking.totalAmount || 0
+};
 
 function Bookings() {
   const [bookings, setBookings] = useState([]);
@@ -267,7 +285,7 @@ function Bookings() {
                 <td className="px-4 py-3 font-medium text-gray-900">{booking.bookingCode}</td>
                 <td className="px-4 py-3">{booking.guestName}</td>
                 <td className="px-4 py-3">
-                  {booking.roomId?.roomNumber || "-"} {booking.roomId?.name || booking.roomType}
+                  {getBookingRoomSummary(booking)}
                 </td>
                 <td className="px-4 py-3">{formatDate(booking.checkIn)}</td>
                 <td className="px-4 py-3">{formatDate(booking.checkOut)}</td>
